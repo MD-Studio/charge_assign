@@ -15,14 +15,12 @@ class AssignmentError(Warning):
 class AtomicCharger:
 
     def __init__(self, repository: Repository=None, nauty: Nauty=None) -> None:
-        if not nauty:
-            self.__nauty = Nauty()
-        if not repository:
-            self.__repo = Repository(nauty=self.__nauty)
+        self.__nauty = nauty or Nauty()
+        self.__repo = repository or Repository(nauty=self.__nauty)
 
     def __set_partial_charges(self, graph: nx.Graph, iacm_only: bool, shell: int) -> nx.Graph:
         shells = sorted(self.__repo.charges_iacm.keys(), reverse=True) if shell < 1 else [shell]
-        for atom in graph.nodes_iter():
+        for atom in graph.nodes():
             for shell in shells:
                 key = self.__nauty.canonize_neighborhood(graph, atom, shell)
                 if key in self.__repo.charges_iacm[shell]:
@@ -47,10 +45,10 @@ class AtomicCharger:
             return list(filter(lambda v: 'bond_type' in graph[u][v] and graph[u][v]['bond_type'] == BondType.AROMATIC,
                                graph.neighbors(u)))
 
-        for atom in graph.nodes_iter():
+        for atom in graph.nodes():
             element = graph.node[atom]['atom_type']
 
-            bas = graph.neighbors(atom)
+            bas = list(graph.neighbors(atom))
             if element == 'C':
                 bhs = list(filter(lambda a: graph.node[a]['atom_type'] == 'H', bas))
                 if len(bas) == 4 and len(bhs) == 0:

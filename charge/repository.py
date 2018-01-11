@@ -81,7 +81,7 @@ class Repository:
 
     def __iter_atomic_fragments(self, graph: nx.Graph, shell: int):
         for atom in graph.nodes():
-            partial_charge = graph.node[atom]['partial_charge']
+            partial_charge = float(graph.node[atom]['partial_charge'])
             yield self.__nauty.canonize_neighborhood(graph, atom, shell), partial_charge
 
     def __iterate(self, data_location: str, molid: int,

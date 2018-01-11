@@ -9,7 +9,7 @@ for path in os.environ["PATH"].split(os.pathsep):
         NAUTY_EXC = fpath
         break
 else:
-    NAUTY_EXC = os.path.expanduser('~/workspace/nauty26r7/dreadnaut')
+    NAUTY_EXC = os.path.expanduser('~/nauty26r7/dreadnaut')
 
 REPO_LOCATION='atb.zip'
 
@@ -40,30 +40,30 @@ IACM_ELEMENTS = ['O', 'OM', 'OA',  'OE',  'OW',  'N', 'NT',
                  'OUrea', 'NUrea', 'CH3p', 'I', 'CLOpt', 'B',
                  'SE', 'HS14', 'CLAro', 'BROpt']
 
-DB_SCHEMA = {
-    "type": "object",
-    "additionalProperties": {
-        "type": "object",
-        "properties": {
-            "core_ids": { "type": "array", "items": { "type": "number" } },
-            "atoms": { "type": "object", "additionalProperties": { "type": "string" } },
-            "bonds": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
-            "charges": { "type": "array", "items": { "type": "number" } },
-            "uncertainties": { "type": "array", "items": { "type": "number" } }
-        }
-    }
-}
-
-ATOMIC_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "core_atoms": { "type": "array", "items": { "type": "number" } },
-        "atom_mappings": {
-           "type": "object",
-            "additionalProperties": {
-                "type": "array",
-                "items": { "type": "object", "additionalProperties": { "type": "number" } }
-            }
-        }
-    }
-}
+# DB_SCHEMA = {
+#     "type": "object",
+#     "additionalProperties": {
+#         "type": "object",
+#         "properties": {
+#             "core_ids": { "type": "array", "items": { "type": "number" } },
+#             "atoms": { "type": "object", "additionalProperties": { "type": "string" } },
+#             "bonds": { "type": "array", "items": { "type": "array", "items": { "type": "number" } } },
+#             "charges": { "type": "array", "items": { "type": "number" } },
+#             "uncertainties": { "type": "array", "items": { "type": "number" } }
+#         }
+#     }
+# }
+#
+# ATOMIC_SCHEMA = {
+#     "type": "object",
+#     "properties": {
+#         "core_atoms": { "type": "array", "items": { "type": "number" } },
+#         "atom_mappings": {
+#            "type": "object",
+#             "additionalProperties": {
+#                 "type": "array",
+#                 "items": { "type": "object", "additionalProperties": { "type": "number" } }
+#             }
+#         }
+#     }
+# }

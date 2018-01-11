@@ -50,7 +50,7 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                     raise ValueError('Missing attribute "atomType".')
             else:
                 values = line.split()
-                attr = {'atom_type': IACM_ELEMENTS[int(values[keys.index('atomType')])],
+                attr = {'atom_type': IACM_ELEMENTS[int(values[keys.index('atomType')])-1],
                         'label': values[keys.index('label2')],
                         'idx': idx}
                 idx += 1
@@ -58,7 +58,7 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                     if key == 'label' or key == 'atomType' or key == 'label2':
                         continue
                     attr[key] = values[keys.index(key)]
-                graph.add_node(int(values[keys.index('label')]), attr_dict=attr)
+                graph.add_node(int(values[keys.index('label')]), **attr)
 
         if edges:
             if header:
@@ -73,7 +73,7 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                     if key == 'label':
                         continue
                     attr[key] = values[keys.index(key)+2]
-                graph.add_edge(int(values[0]), int(values[1]), attr_dict=attr)
+                graph.add_edge(int(values[0]), int(values[1]), **attr)
     return graph
 
 
@@ -82,7 +82,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
     out.write('@nodes\n')
 
     idxmap = {}
-    keys = set.union(*map(lambda n: set(n[1].keys()), graph.nodes_iter(data=True)))
+    keys = set.union(*map(lambda n: set(n[1].keys()), graph.nodes(data=True)))
     keys.remove('atom_type')
     keys.remove('idx')
     if 'label' in keys:
@@ -93,7 +93,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
     out.write('\n')
 
     el_count = defaultdict(lambda: 1)
-    for i, (v, data) in enumerate(graph.nodes_iter(data=True)):
+    for i, (v, data) in enumerate(graph.nodes(data=True)):
         idx = i + 1
         idxmap[v] = idx
         if not data['atom_type'] in IACM_MAP:
@@ -105,7 +105,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
         else:
             label = '%s%d' % (element, el_count[element])
         el_count[element] += 1
-        iacm_num = IACM_ELEMENTS.index(data['atom_type'])
+        iacm_num = IACM_ELEMENTS.index(data['atom_type'])+1
 
         out.write('%d\t%s\t%d\t' % (idx, label, iacm_num))
 
@@ -116,7 +116,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
                 out.write('%s\t')
         out.write('\n')
 
-    keys = set.union(*map(lambda n: set(n[2].keys()), graph.edges_iter(data=True)))
+    keys = set.union(*map(lambda n: set(n[2].keys()), graph.edges(data=True)))
     if 'orig_bond_type' in keys:
         keys.remove('orig_bond_type')
 
@@ -125,7 +125,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
         out.write('%s\t' % k)
     out.write('\n')
 
-    for i, (u, v, data) in enumerate(graph.edges_iter(data=True)):
+    for i, (u, v, data) in enumerate(graph.edges(data=True)):
         out.write('%d\t%d\t%d\t' % (idxmap[u], idxmap[v], i))
         for k in keys:
             if k in data:
@@ -152,11 +152,11 @@ def __gml_to_nx(obj: str) -> nx.Graph:
 
 def __nx_to_gml(graph: nx.Graph) -> str:
     cp = graph.copy()
-    for v, data in cp.nodes_iter(data=True):
+    for v, data in cp.nodes(data=True):
         if 'idx' in data:
             del data['idx']
 
-    for e, data in cp.edges_iter(data=True):
+    for e, data in cp.edges(data=True):
         if 'orig_bond_type' in data:
             del data['orig_bond_type']
 
@@ -173,7 +173,7 @@ def __rdmol_to_nx(obj: Any) -> nx.Graph:
         props = atom.GetPropsAsDict()
         props['idx'] = idx
         props['atom_type'] = atom.GetSymbol()
-        graph.add_node(atom.GetIdx(), attr_dict=props)
+        graph.add_node(atom.GetIdx(), **props)
     
     for bond in obj.GetBonds():
         props = bond.GetPropsAsDict()
@@ -188,7 +188,7 @@ def __rdmol_to_nx(obj: Any) -> nx.Graph:
             props['bond_type'] = BondType.AROMATIC
         else:
             props['bond_type'] = BondType.UNKNOWN
-        graph.add_edge(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx(), attr_dict=props)
+        graph.add_edge(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx(), **props)
     
     return graph
 
@@ -198,7 +198,7 @@ def __nx_to_rdmol(graph: nx.Graph) -> Any:
     mol = Chem.RWMol()
     idxmap = {}
 
-    for v, data in graph.nodes_iter(data=True):
+    for v, data in graph.nodes(data=True):
         idxmap[v] = mol.AddAtom(data['atom_type'])
         atom = mol.GetAtomWithIdx(idxmap[v])
         for k, v in data:
@@ -215,7 +215,7 @@ def __nx_to_rdmol(graph: nx.Graph) -> Any:
             else:
                 raise ValueError('Invalid property type for key %s' % k)
 
-    for (u, v), data in graph.edges_iter(data=True):
+    for (u, v), data in graph.edges(data=True):
         if 'orig_bond_type' in data and isinstance(data['orig_bond_type'], Chem.BondType):
             btype = data['orig_bond_type']
         elif data['bond_type'] == BondType.SINGLE:

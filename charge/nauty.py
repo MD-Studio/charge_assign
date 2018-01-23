@@ -20,7 +20,7 @@ class Nauty:
                              'anu.edu.au/~bdm/nauty/)?' % executable)
         self.__exe = executable
 
-    def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int) -> str:
+    def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int, color_key='atom_type') -> str:
         fragment = nx.Graph()
 
         visited = {atom}
@@ -47,7 +47,7 @@ class Nauty:
                 if graph.has_edge(u, v):
                     fragment.add_edge(u, v)
 
-        return self.canonize(fragment)
+        return self.canonize(fragment, color_key=color_key)
 
     def canonize(self, graph: nx.Graph, color_key='atom_type', with_core:bool=True) -> str:
 

@@ -22,7 +22,8 @@ class AtomicCharger:
         shells = sorted(self.__repo.charges_iacm.keys(), reverse=True) if shell < 1 else [shell]
         for atom in graph.nodes():
             for shell in shells:
-                key = self.__nauty.canonize_neighborhood(graph, atom, shell)
+                key = self.__nauty.canonize_neighborhood(graph, atom, shell,
+                                                         color_key='iacm' if 'iacm' in graph.node[atom] else 'atom_type')
                 if key in self.__repo.charges_iacm[shell]:
                     values = self.__repo.charges_iacm[shell][key]
                     graph.node[atom]['partial_charge'] = numpy.mean(values)
@@ -78,7 +79,7 @@ class AtomicCharger:
                     graph.node[atom]['iacm'] = 'NR'
                 elif len(aromatic_neighbors(atom)) > 1:
                     graph.node[atom]['iacm'] = 'NR'
-                elif len(list(filter(lambda a: a.GetSymbol() == 'H', bas))) < 2:
+                elif len(list(filter(lambda a: graph.node[a]['atom_type'] == 'H', bas))) < 2:
                     graph.node[atom]['iacm'] = 'N'
                 else:
                     graph.node[atom]['iacm'] = 'NT'
@@ -102,7 +103,7 @@ class AtomicCharger:
 
         return graph
 
-    def charge(self, graph: nx.Graph, iacmize:bool=True, iacm_only:bool=False, shell:int=None) -> nx.Graph:
+    def charge(self, graph: nx.Graph, iacmize:bool=False, iacm_only:bool=False, shell:int=None) -> nx.Graph:
         if iacmize:
             graph = self.__iacmize(graph)
         return self.__set_partial_charges(graph, iacm_only=iacm_only or iacmize,

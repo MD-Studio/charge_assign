@@ -4,6 +4,7 @@ from collections import defaultdict
 from itertools import groupby
 from typing import Callable
 
+import math
 import networkx as nx
 
 from charge.babel import convert_from, IOType
@@ -38,9 +39,9 @@ class Repository:
                   for fn in os.listdir(data_location) if fn.endswith('.lgf')]
 
         canons = dict()
-        for molid in molids:
+        frac = math.ceil((len(molids) * self.__max_shell) / 100)
+        for i, molid in enumerate(molids):
             with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
-                print(molid)
                 graph = convert_from(f.read(), IOType.LGF)
                 if iacm_to_elements:
                     for v, data in graph.nodes(data=True):
@@ -48,13 +49,15 @@ class Repository:
                 canons[molid] = self.__nauty.canonize(graph, with_core=False)
 
                 for shell in range(1, self.__max_shell + 1):
-                    print(molid, shell)
+                    if (i+shell)%frac == 0:
+                        print('.', end='', flush=True)
                     if not iacm_to_elements:
                         for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
                             self.charges_iacm[shell][key].append(partial_charge)
                     else:
                         for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
                             self.charges_elem[shell][key].append(partial_charge)
+        print()
 
         if not iacm_to_elements:
             self.__iso_iacm = defaultdict(list)

@@ -5,6 +5,9 @@ from itertools import groupby
 from typing import Callable
 
 import math
+from zipfile import ZipFile
+
+import msgpack
 import networkx as nx
 
 from charge.babel import convert_from, IOType
@@ -31,7 +34,13 @@ class Repository:
             self.__create(data_location)
             self.__create(data_location, iacm_to_elements=True)
 
-        # TODO else read from input file (location)
+        else:
+            with ZipFile(location, mode='r') as zf:
+                (self.__max_shell) = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
+                self.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
+                self.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
+                self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
+                self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, iacm_to_elements: bool=False) -> None:
         # TODO add support for ITF files
@@ -128,5 +137,9 @@ class Repository:
                        )
 
     def write(self, out: str):
-        # TODO write to output file
-        pass
+        with ZipFile(out, mode='w') as zf:
+            zf.writestr('meta', msgpack.packb((self.__max_shell)))
+            zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
+            zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
+            zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
+            zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))

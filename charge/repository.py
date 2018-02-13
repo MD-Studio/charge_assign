@@ -2,11 +2,13 @@ import bisect
 import os
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable
+from multiprocessing.pool import Pool
+from typing import Callable, List
 
 import math
 from zipfile import ZipFile
 
+import itertools
 import msgpack
 import networkx as nx
 
@@ -21,8 +23,13 @@ class LoadError(Exception):
 
 class Repository:
 
-    def __init__(self, location: str= REPO_LOCATION, data_location: str=None, nauty: Nauty=None,
-                 min_shell: int=1, max_shell: int=7) -> None:
+    def __init__(self,
+                 location: str= REPO_LOCATION,
+                 data_location: str=None,
+                 nauty: Nauty=None,
+                 min_shell: int=1,
+                 max_shell: int=7,
+                 processes: int=None) -> None:
 
         self.__nauty = nauty or Nauty()
         self.__min_shell = max(min_shell, 0)
@@ -32,8 +39,10 @@ class Repository:
         self.charges_elem = defaultdict(lambda: defaultdict(list))
 
         if data_location:
-            self.__create(data_location)
-            self.__create(data_location, iacm_to_elements=True)
+            if processes:
+                processes = max(processes, 1)
+            self.__create(data_location, processes)
+            self.__create(data_location, processes, iacm_to_elements=True)
 
         else:
             with ZipFile(location, mode='r') as zf:
@@ -43,31 +52,41 @@ class Repository:
                 self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
                 self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
-    def __create(self, data_location: str, iacm_to_elements: bool=False) -> None:
+    def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
         # TODO add support for ITF files
         molids = [int(fn.replace('.lgf', ''))
                   for fn in os.listdir(data_location) if fn.endswith('.lgf')]
 
-        canons = dict()
-        frac = math.ceil((len(molids) * (self.__max_shell - self.__min_shell)) / 100)
-        for i, molid in enumerate(molids):
-            with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
-                graph = convert_from(f.read(), IOType.LGF)
-                if iacm_to_elements:
-                    for v, data in graph.nodes(data=True):
-                        graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-                canons[molid] = self.__nauty.canonize(graph, with_core=False)
+        if iacm_to_elements:
+            print('IACM to element mode...')
+        print('reading files', end='', flush=True)
 
-                for shell in range(self.__min_shell, self.__max_shell + 1):
-                    if (i+shell)%frac == 0:
-                        print('.', end='', flush=True)
-                    if not iacm_to_elements:
-                        for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
-                            self.charges_iacm[shell][key].append(partial_charge)
-                    else:
-                        for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
-                            self.charges_elem[shell][key].append(partial_charge)
-        print()
+        chunksize = int(math.ceil(len(molids) / 100))
+        chunks = map(lambda i:
+                     (molids[i:i+chunksize], data_location, iacm_to_elements, self.__nauty),
+                     range(0, len(molids), chunksize))
+        with Pool(processes) as pool:
+            graphs = pool.starmap(read, chunks)
+        print(flush=True)
+        graphs, canons = zip(*itertools.chain.from_iterable(graphs))
+        canons = dict(zip(molids, canons))
+
+        for shell in range(self.__min_shell, self.__max_shell + 1):
+            print('shell %d' % shell, end='', flush=True)
+            chunks = map(lambda i:
+                         (graphs[i:i + chunksize], self.__nauty, shell, iacm_to_elements),
+                         range(0, len(graphs), chunksize))
+            with Pool(processes) as pool:
+                charges = pool.starmap(get_charges, chunks)
+            print(flush=True)
+            if not iacm_to_elements:
+                for c in charges:
+                    for key, values in c.items():
+                        self.charges_iacm[shell][key] += values
+            else:
+                for c in charges:
+                    for key, values in c.items():
+                        self.charges_elem[shell][key] += values
 
         if not iacm_to_elements:
             self.__iso_iacm = defaultdict(list)
@@ -92,11 +111,6 @@ class Repository:
                 for key, values in self.charges_elem[shell].items():
                     self.charges_elem[shell][key] = sorted(values)
 
-    def __iter_atomic_fragments(self, graph: nx.Graph, shell: int):
-        for atom in graph.nodes():
-            partial_charge = float(graph.node[atom]['partial_charge'])
-            yield self.__nauty.canonize_neighborhood(graph, atom, shell), partial_charge
-
     def __iterate(self, data_location: str, molid: int,
                   callable_iacm: Callable[[int, str, float], None],
                   callable_elem: Callable[[int, str, float], None]):
@@ -111,7 +125,7 @@ class Repository:
             with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
                 graph = convert_from(f.read(), IOType.LGF)
                 for shell in range(1, self.__max_shell + 1):
-                    for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
+                    for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_iacm(shell, key, partial_charge)
 
         for molid in ids_elem:
@@ -120,7 +134,7 @@ class Repository:
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 for shell in range(1, self.__max_shell + 1):
-                    for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
+                    for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
 
     def add(self, data_location: str, molid: int):
@@ -155,3 +169,34 @@ class Repository:
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
             zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
+
+
+def read(molids: List[int], data_location: str, iacm_to_elements: bool, nauty: Nauty):
+    res = []
+    for molid in molids:
+        with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
+            graph = convert_from(f.read(), IOType.LGF)
+            if iacm_to_elements:
+                for v, data in graph.nodes(data=True):
+                    graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
+            canon = nauty.canonize(graph, with_core=False)
+            res.append((graph, canon))
+    print('.', end='', flush=True)
+    return res
+
+def get_charges(graphs: List[nx.Graph], nauty: Nauty, shell: int, iacm_to_elements: bool):
+    charges = defaultdict(list)
+    for graph in graphs:
+        if not iacm_to_elements:
+            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
+                charges[key].append(partial_charge)
+        else:
+            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
+                charges[key].append(partial_charge)
+    print('.', end='', flush=True)
+    return charges
+
+def iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):
+    for atom in graph.nodes():
+        partial_charge = float(graph.node[atom]['partial_charge'])
+        yield nauty.canonize_neighborhood(graph, atom, shell), partial_charge

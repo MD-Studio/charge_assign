@@ -22,9 +22,10 @@ class LoadError(Exception):
 class Repository:
 
     def __init__(self, location: str= REPO_LOCATION, data_location: str=None, nauty: Nauty=None,
-                 max_shell: int=7) -> None:
+                 min_shell: int=1, max_shell: int=7) -> None:
 
         self.__nauty = nauty or Nauty()
+        self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 
         self.charges_iacm = defaultdict(lambda: defaultdict(list))
@@ -36,7 +37,7 @@ class Repository:
 
         else:
             with ZipFile(location, mode='r') as zf:
-                (self.__max_shell) = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
+                self.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
                 self.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
                 self.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
                 self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
@@ -48,7 +49,7 @@ class Repository:
                   for fn in os.listdir(data_location) if fn.endswith('.lgf')]
 
         canons = dict()
-        frac = math.ceil((len(molids) * self.__max_shell) / 100)
+        frac = math.ceil((len(molids) * (self.__max_shell - self.__min_shell)) / 100)
         for i, molid in enumerate(molids):
             with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
                 graph = convert_from(f.read(), IOType.LGF)
@@ -57,7 +58,7 @@ class Repository:
                         graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 canons[molid] = self.__nauty.canonize(graph, with_core=False)
 
-                for shell in range(1, self.__max_shell + 1):
+                for shell in range(self.__min_shell, self.__max_shell + 1):
                     if (i+shell)%frac == 0:
                         print('.', end='', flush=True)
                     if not iacm_to_elements:
@@ -99,8 +100,8 @@ class Repository:
     def __iterate(self, data_location: str, molid: int,
                   callable_iacm: Callable[[int, str, float], None],
                   callable_elem: Callable[[int, str, float], None]):
-        ids_iacm = set(molid)
-        ids_elem = set(molid)
+        ids_iacm = {molid}
+        ids_elem = {molid}
         if molid in self.__iso_iacm:
             ids_iacm.union(set(self.__iso_iacm[molid]))
         if molid in self.__iso_elem:
@@ -111,7 +112,7 @@ class Repository:
                 graph = convert_from(f.read(), IOType.LGF)
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
-                        callable_iacm(key, partial_charge)
+                        callable_iacm(shell, key, partial_charge)
 
         for molid in ids_elem:
             with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
@@ -120,25 +121,36 @@ class Repository:
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in self.__iter_atomic_fragments(graph, shell):
-                        callable_elem(key, partial_charge)
+                        callable_elem(shell, key, partial_charge)
 
     def add(self, data_location: str, molid: int):
+        def a(shell, key, partial_charge, repo):
+            if not shell in repo:
+                repo[shell] = dict()
+            if not key in repo[shell]:
+                repo[shell][key] = []
+            bisect.insort_left(repo[shell][key], partial_charge)
+
         self.__iterate(data_location, molid,
-            lambda shell, key, partial_charge: bisect.insort_left(self.charges_iacm[shell][key], partial_charge),
-            lambda shell, key, partial_charge: bisect.insort_left(self.charges_iacm[shell][key], partial_charge)
+            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_iacm),
+            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_elem)
         )
 
     def subtract(self,  data_location: str, molid: int):
+        def s(shell, key, partial_charge, repo):
+            repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
+            if len(repo[shell][key]) == 0:
+                del repo[shell][key]
+            if len(repo[shell]) == 0:
+                del repo[shell]
+
         self.__iterate(data_location, molid,
-            lambda shell, key, partial_charge: \
-                self.charges_iacm[shell][key].pop(bisect.bisect_left(self.charges_iacm[shell][key], partial_charge)),
-            lambda shell, key, partial_charge: \
-               self.charges_elem[shell][key].pop(bisect.bisect_left(self.charges_elem[shell][key], partial_charge))
-                       )
+            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_iacm),
+            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
 
     def write(self, out: str):
         with ZipFile(out, mode='w') as zf:
-            zf.writestr('meta', msgpack.packb((self.__max_shell)))
+            zf.writestr('meta', msgpack.packb((self.__min_shell, self.__max_shell)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
             zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))

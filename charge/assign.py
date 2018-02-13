@@ -19,7 +19,7 @@ class AtomicCharger:
         self.__repo = repository or Repository(nauty=self.__nauty)
 
     def __set_partial_charges(self, graph: nx.Graph, iacm_only: bool, shell: int) -> nx.Graph:
-        shells = sorted(self.__repo.charges_iacm.keys(), reverse=True) if shell < 1 else [shell]
+        shells = sorted(self.__repo.charges_iacm.keys(), reverse=True) if shell < 0 else [shell]
         for atom in graph.nodes():
             for shell in shells:
                 key = self.__nauty.canonize_neighborhood(graph, atom, shell,
@@ -37,7 +37,9 @@ class AtomicCharger:
                         graph.node[atom]['partial_charge_std'] = numpy.std(values)
                         break
             else:
-                warnings.warn(AssignmentError('Could not assign charge_assign to atom {0}'.format(atom)))
+                warnings.warn(AssignmentError('Could not assign charge to atom {0}'.format(atom)))
+                graph.node[atom]['partial_charge'] = float('nan')
+                graph.node[atom]['partial_charge_std'] = float('nan')
 
         return graph
 
@@ -107,4 +109,4 @@ class AtomicCharger:
         if iacmize:
             graph = self.__iacmize(graph)
         return self.__set_partial_charges(graph, iacm_only=iacm_only or iacmize,
-                                          shell=shell if shell and shell > 0 else -1)
+                                          shell=shell if shell and shell >= 0 else -1)

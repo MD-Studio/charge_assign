@@ -11,11 +11,15 @@ from zipfile import ZipFile
 import itertools
 import msgpack
 import networkx as nx
+from multiprocessing import Value
 
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP
+from charge.util import print_progress
 
+progress = Value('i', 0)
+total = Value('i', 100)
 
 class Repository:
 
@@ -60,31 +64,38 @@ class Repository:
                 self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
+        global progress
+        global total
         molids = [int(fn.replace(self.__ext, ''))
                   for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
 
         if iacm_to_elements:
             print('IACM to element mode...')
-        print('reading files', end='', flush=True)
 
-        chunksize = int(math.ceil(len(molids) / 100))
-        chunks = map(lambda i:
-                     (molids[i:i+chunksize], data_location, iacm_to_elements, self.__nauty, self.__ext, self.__data_type),
-                     range(0, len(molids), chunksize))
+        progress.value = 0
+        total.value = len(molids)
+        chunks = map(lambda molid:
+                     (molid, data_location, iacm_to_elements, self.__nauty, self.__ext, self.__data_type),
+                     molids)
         with Pool(processes) as pool:
             graphs = pool.starmap(read, chunks)
-        print(flush=True)
+        if progress.value != total.value:
+            print_progress(total.value, total.value, prefix='reading files:')
+
         graphs, canons = zip(*itertools.chain.from_iterable(graphs))
         canons = dict(zip(molids, canons))
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            print('shell %d' % shell, end='', flush=True)
-            chunks = map(lambda i:
-                         (graphs[i:i + chunksize], self.__nauty, shell, iacm_to_elements),
-                         range(0, len(graphs), chunksize))
+            progress.value = 0
+            total.value = len(graphs)
+            chunks = map(lambda graph:
+                         (graph, self.__nauty, shell, iacm_to_elements),
+                         graphs)
             with Pool(processes) as pool:
                 charges = pool.starmap(get_charges, chunks)
-            print(flush=True)
+            if progress.value != total.value:
+                print_progress(total.value, total.value, prefix='shell %d:' % shell)
+
             if not iacm_to_elements:
                 for c in charges:
                     for key, values in c.items():
@@ -177,29 +188,32 @@ class Repository:
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
 
-def read(molids: List[int], data_location: str, iacm_to_elements: bool, nauty: Nauty, ext: str, data_type: IOType):
+def read(molid: int, data_location: str, iacm_to_elements: bool, nauty: Nauty, ext: str, data_type: IOType):
+    global progress
+    global total
     res = []
-    for molid in molids:
-        with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
-            graph = convert_from(f.read(), data_type)
-            if iacm_to_elements:
-                for v, data in graph.nodes(data=True):
-                    graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-            canon = nauty.canonize(graph, with_core=False)
-            res.append((graph, canon))
-    print('.', end='', flush=True)
+
+    with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
+        graph = convert_from(f.read(), data_type)
+        if iacm_to_elements:
+            for v, data in graph.nodes(data=True):
+                graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
+        canon = nauty.canonize(graph, with_core=False)
+        res.append((graph, canon))
+    progress.value += 1
+    print_progress(progress.value, total.value, prefix='reading files:')
     return res
 
-def get_charges(graphs: List[nx.Graph], nauty: Nauty, shell: int, iacm_to_elements: bool):
+def get_charges(graph: nx.Graph, nauty: Nauty, shell: int, iacm_to_elements: bool):
     charges = defaultdict(list)
-    for graph in graphs:
-        if not iacm_to_elements:
-            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
-                charges[key].append(partial_charge)
-        else:
-            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
-                charges[key].append(partial_charge)
-    print('.', end='', flush=True)
+
+    if not iacm_to_elements:
+        for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
+            charges[key].append(partial_charge)
+    else:
+        for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
+            charges[key].append(partial_charge)
+    print_progress(progress.value, total.value, prefix='shell %d:' % shell)
     return charges
 
 def iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):

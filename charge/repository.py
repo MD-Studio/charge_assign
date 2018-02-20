@@ -17,15 +17,12 @@ from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP
 
 
-class LoadError(Exception):
-    pass
-
-
 class Repository:
 
     def __init__(self,
                  location: str= REPO_LOCATION,
                  data_location: str=None,
+                 data_type: IOType=IOType.LGF,
                  nauty: Nauty=None,
                  min_shell: int=1,
                  max_shell: int=7,
@@ -37,6 +34,16 @@ class Repository:
 
         self.charges_iacm = defaultdict(lambda: defaultdict(list))
         self.charges_elem = defaultdict(lambda: defaultdict(list))
+
+        if data_type == IOType.LGF:
+            self.__ext = '.lgf'
+        elif data_type == IOType.GML:
+            self.__ext = '.gml'
+        elif data_type == IOType.ITP:
+            self.__ext = '.itp'
+        else:
+            raise ValueError('Unsupported file type: {}'.format(data_type.name))
+        self.__data_type = data_type
 
         if data_location:
             if processes:
@@ -53,9 +60,8 @@ class Repository:
                 self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
-        # TODO add support for ITF files
-        molids = [int(fn.replace('.lgf', ''))
-                  for fn in os.listdir(data_location) if fn.endswith('.lgf')]
+        molids = [int(fn.replace(self.__ext, ''))
+                  for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
 
         if iacm_to_elements:
             print('IACM to element mode...')
@@ -63,7 +69,7 @@ class Repository:
 
         chunksize = int(math.ceil(len(molids) / 100))
         chunks = map(lambda i:
-                     (molids[i:i+chunksize], data_location, iacm_to_elements, self.__nauty),
+                     (molids[i:i+chunksize], data_location, iacm_to_elements, self.__nauty, self.__ext, self.__data_type),
                      range(0, len(molids), chunksize))
         with Pool(processes) as pool:
             graphs = pool.starmap(read, chunks)
@@ -122,15 +128,15 @@ class Repository:
             ids_iacm.union(set(self.__iso_elem[molid]))
 
         for molid in ids_iacm:
-            with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
-                graph = convert_from(f.read(), IOType.LGF)
+            with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
+                graph = convert_from(f.read(), self.__data_type)
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_iacm(shell, key, partial_charge)
 
         for molid in ids_elem:
-            with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
-                graph = convert_from(f.read(), IOType.LGF)
+            with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
+                graph = convert_from(f.read(), self.__data_type)
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 for shell in range(1, self.__max_shell + 1):
@@ -171,11 +177,11 @@ class Repository:
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
 
-def read(molids: List[int], data_location: str, iacm_to_elements: bool, nauty: Nauty):
+def read(molids: List[int], data_location: str, iacm_to_elements: bool, nauty: Nauty, ext: str, data_type: IOType):
     res = []
     for molid in molids:
-        with open(os.path.join(data_location, '%d.lgf' % molid), 'r') as f:
-            graph = convert_from(f.read(), IOType.LGF)
+        with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
+            graph = convert_from(f.read(), data_type)
             if iacm_to_elements:
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
@@ -198,5 +204,7 @@ def get_charges(graphs: List[nx.Graph], nauty: Nauty, shell: int, iacm_to_elemen
 
 def iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):
     for atom in graph.nodes():
+        if not 'partial_charge' in graph.node[atom]:
+            raise KeyError('Missing property "partial_charge" for atom {}'.format(atom))
         partial_charge = float(graph.node[atom]['partial_charge'])
         yield nauty.canonize_neighborhood(graph, atom, shell), partial_charge

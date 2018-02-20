@@ -5,13 +5,13 @@ Conversion of a `networkx <http://networkx.github.io/>`_ graph from/to different
 
 """
 
+import re
 from collections import defaultdict
 from enum import Enum
 from io import StringIO
 from typing import Any
 
 import networkx as nx
-import re
 
 from charge.settings import IACM_MAP, IACM_ELEMENTS
 
@@ -112,9 +112,9 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                 graph.add_edge(int(values[0]), int(values[1]), **attr)
 
     if charge_groups:
-        graph.graph['charge_groups'] = dict((k, 0.0) for k in charge_groups)
+        graph.graph['group_charges'] = dict((k, 0.0) for k in charge_groups)
     else:
-        graph.graph['charge_groups'] = {0: 0.0}
+        graph.graph['group_charges'] = {0: 0.0}
 
     return graph
 
@@ -210,40 +210,119 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
 
 
 def __gml_to_nx(obj: str) -> nx.Graph:
-    # TODO check all keys and values
-    # TODO group charges
-    graph = nx.parse_gml(obj)
-    for v in enumerate(graph.nodes_iter()):
-        if not 'atom_type' in graph.node[v]:
-            raise ValueError('Missing attribute "atom_type" for atom {0}'.format(v))
-        if not graph.node[v]['atom_type'] in IACM_ELEMENTS:
-            raise ValueError('Unknown "atom_type" for atom {0}: {1}'.format(v, graph.node[v]['atom_type']))
+    el_count = defaultdict(int)
+    group_charges = dict()
 
-    return graph
+    graph = nx.parse_gml(obj)
+    cp = nx.convert_node_labels_to_integers(graph, first_label=1, label_attribute='label')
+    if 'name' in graph.graph:
+        cp.graph['name'] = graph.graph['name']
+    else:
+        del cp.graph['name']
+
+    for v, data in cp.nodes.data():
+        if not isinstance(v, int):
+            raise ValueError('id {0} is not int.'.format(v))
+        if 'partialcharge' in data:
+            data['partial_charge'] = data.pop('partialcharge')
+        if not 'atomtype' in data:
+            raise ValueError('Missing attribute "atomtype" for atom {0}'.format(v))
+        data['atom_type'] = data.pop('atomtype')
+        if not data['atom_type'] in IACM_ELEMENTS:
+            raise ValueError('Unknown "atom_type" for atom {0}: {1}'.format(v, data['atom_type']))
+        element = IACM_MAP[data['atom_type']]
+        el_count[element] += 1
+        if not 'label' in data or not isinstance('label', str):
+            data['label'] = '%s%d' % (element, el_count[element])
+        if not 'chargegroup' in data:
+            data['charge_group'] = 0
+        else:
+            data['charge_group'] = data.pop('chargegroup')
+        group_charges[data['charge_group']] = 0.0
+
+    for _, _, data in cp.edges.data():
+        if not 'bondtype' in data:
+            data['bond_type'] = BondType.UNKNOWN
+        else:
+            try:
+                data['bond_type'] = BondType(data.pop('bondtype'))
+            except:
+                del data['bondtype']
+                data['bond_type'] = BondType.UNKNOWN
+
+    for k in list(cp.graph.keys()):
+        m = re.fullmatch(r'groupcharge(\d+)', k)
+        if m:
+            group_idx = int(m.group(1))
+            if group_idx in group_charges:
+                group_charges[group_idx] = float(cp.graph[k])
+            del cp.graph[k]
+
+    for _, data in cp.nodes.data():
+        if not data['charge_group'] in group_charges:
+            group_charges[data['charge_group']] = 0.0
+    cp.graph['group_charges'] = group_charges
+
+    return cp
 
 
 def __nx_to_gml(graph: nx.Graph) -> str:
-    # TODO check all keys and values
-    # TODO group charges
     cp = graph.copy()
+    el_count = defaultdict(int)
 
-    for e, data in cp.edges(data=True):
+    for _, data in cp.nodes(data=True):
+        element = IACM_MAP[data['atom_type']]
+        el_count[element] += 1
+        if not 'label' in data or not isinstance('label', str):
+            data['label'] = '%s%d' % (element, el_count[element])
+
+    nx.relabel_nodes(cp, mapping=dict((v, data['label']) for v, data in cp.nodes.data()),  copy=False)
+
+    for u, v, data in cp.edges(data=True):
         if 'rdkit_bond_type' in data:
             del data['rdkit_bond_type']
+        if 'bond_type' in data and isinstance(data['bond_type'], BondType):
+            data['bondtype'] = data.pop('bond_type').value
 
-    return nx.generate_gml(cp)
+    for v, data in cp.nodes(data=True):
+        if 'iacm' in data:
+            data['atomtype'] = data.pop('iacm')
+            del data['atom_type']
+        else:
+            data['atomtype'] = data.pop('atom_type')
+        if 'charge_group' in data:
+            data['chargegroup'] = data.pop('charge_group')
+        if 'partial_charge' in data:
+            data['partialcharge'] = data.pop('partial_charge')
+
+    if 'group_charges' in cp.graph and isinstance(cp.graph['group_charges'], dict):
+        for k, v in cp.graph['group_charges'].items():
+            cp.graph['groupcharge%d' % k] = v
+        del cp.graph['group_charges']
+
+    return "\n".join(nx.generate_gml(cp))
 
 
 def __rdmol_to_nx(obj: Any) -> nx.Graph:
-    # TODO check all keys and values
     from rdkit import Chem
     if not isinstance(obj, Chem.Mol):
         raise ValueError('Invalid input. Chem.Mol required.')
     graph = nx.Graph()
+    el_count = defaultdict(int)
+    group_charges = {}
     
     for atom in obj.GetAtoms():
         props = atom.GetPropsAsDict()
-        props['atom_type'] = atom.GetSymbol()
+
+        element = atom.GetSymbol()
+        el_count[element] += 1
+        if not 'atom_type' in props:
+            props['atom_type'] = element
+        if not 'charge_group' in props or not isinstance(props['charge_group'], int):
+            props['charge_group'] = 0
+        group_charges[props['charge_group']] = 0.0
+        if not 'label' in props or not isinstance(props['label'], str):
+            props['label'] = '%s%d' % (element, el_count[element])
         graph.add_node(atom.GetIdx(), **props)
     
     for bond in obj.GetBonds():
@@ -260,34 +339,61 @@ def __rdmol_to_nx(obj: Any) -> nx.Graph:
         else:
             props['bond_type'] = BondType.UNKNOWN
         graph.add_edge(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx(), **props)
-    
+
+    for k, v in obj.GetPropsAsDict().items():
+        m = re.fullmatch(r'group_charge_(\d+)', k)
+        if m:
+            group_idx = int(m.group(1))
+            if group_idx in group_charges:
+                group_charges[group_idx] = float(v)
+
+    if len(group_charges) == 0:
+        for _, data in graph.nodes.data():
+            if not data['charge_group'] in group_charges:
+                group_charges[data['charge_group']] = 0.0
+    graph.graph['group_charges'] = group_charges
+
     return graph
 
 
 def __nx_to_rdmol(graph: nx.Graph) -> Any:
-    # TODO check all keys and values
     from rdkit import Chem
     mol = Chem.RWMol()
     idxmap = {}
+    el_count = defaultdict(int)
 
     for v, data in graph.nodes(data=True):
-        idxmap[v] = mol.AddAtom(data['atom_type'])
-        atom = mol.GetAtomWithIdx(idxmap[v])
-        for k, v in data:
-            if k == 'atom_type':
+        if not 'atom_type' in data:
+            raise ValueError('Missing atom type for atom {}'.format(v))
+
+        element = IACM_MAP[data['atom_type']]
+        atom = Chem.Atom(element)
+        el_count[element] += 1
+
+        if not 'label' in data:
+            atom.SetProp('label', '%s%d' % (element, el_count[element]))
+
+        if 'iacm' in data and data['iacm'] != element:
+            atom.SetProp('atom_type', data['iacm'])
+        elif data['atom_type'] != element:
+            atom.SetProp('atom_type', data['atom_type'])
+
+        for k, val in data.items():
+            if k == 'atom_type' or k == 'iacm':
                 continue
-            if isinstance(v, bool):
-                atom.SetBoolProp(k, v)
-            elif isinstance(v, float):
-                atom.SetDoubleProp(k, v)
-            elif isinstance(v, int):
-                atom.SetIntProp(k, v)
-            elif isinstance(v, str):
-                atom.SetProp(k, v)
+            if isinstance(val, bool):
+                atom.SetBoolProp(k, val)
+            elif isinstance(val, float):
+                atom.SetDoubleProp(k, val)
+            elif isinstance(val, int):
+                atom.SetIntProp(k, val)
+            elif isinstance(val, str):
+                atom.SetProp(k, val)
             else:
                 raise ValueError('Invalid property type for key %s' % k)
+        idxmap[v] = mol.AddAtom(atom)
 
-    for (u, v), data in graph.edges(data=True):
+    for u, v, data in graph.edges(data=True):
         if 'rdkit_bond_type' in data and isinstance(data['rdkit_bond_type'], Chem.BondType):
             btype = data['rdkit_bond_type']
         elif 'bond_type' in data:
@@ -305,8 +411,8 @@ def __nx_to_rdmol(graph: nx.Graph) -> Any:
             btype = Chem.BondType.UNSPECIFIED
 
         idx = mol.AddBond(idxmap[u], idxmap[v], btype)
-        bond = mol.GetBondWithIdx(idx)
-        for k, v in data:
+        bond = mol.GetBondWithIdx(idx-1)
+        for k, v in data.items():
             if k == 'bond_type' or k == 'rdkit_bond_type':
                 continue
             if isinstance(v, bool):
@@ -319,6 +425,10 @@ def __nx_to_rdmol(graph: nx.Graph) -> Any:
                 bond.SetProp(k, v)
             else:
                 raise ValueError('Invalid property type for key %s' % k)
+
+    if 'group_charges' in graph.graph and isinstance(graph.graph['group_charges'], dict):
+        for k, v in graph.graph['group_charges'].items():
+            mol.SetDoubleProp('group_charge_%d' % k, float(v))
 
     return Chem.Mol(mol)
 
@@ -346,6 +456,8 @@ def __itp_to_nx(obj: Any) -> nx.Graph:
     graph = nx.Graph()
     node_keys = None
     edge_keys = None
+    group_charges = dict()
+    charge_groups = 0
 
     nodes, edges, header = False, False, False
     for line in map(lambda line: line.strip(), obj.splitlines()):
@@ -361,7 +473,7 @@ def __itp_to_nx(obj: Any) -> nx.Graph:
             continue
         if nodes:
             if header:
-                node_keys = re.search(r';(.+);*.*', line)
+                node_keys = re.search(r';([^;]+)', line)
                 header = False
                 if node_keys:
                     node_keys = node_keys.group(1).split()
@@ -372,22 +484,35 @@ def __itp_to_nx(obj: Any) -> nx.Graph:
                     if not 'type' in node_keys:
                         raise ValueError('Missing attribute "type".')
             elif node_keys:
-                values = re.search(r'(.+);*.*', line)
-                if values:
-                    values = values.group(1).split()
-                    attr = {'atom_type': IACM_ELEMENTS[int(values[node_keys.index('type')]) - 1],
+                m = re.search(r'([^;]+)(;([^;]+))*', line)
+                if m:
+                    values = m.group(1).split()
+                    atom_type = values[node_keys.index('type')]
+                    if not atom_type in IACM_MAP:
+                        raise ValueError('Unknown atom type: {}'.format(atom_type))
+                    attr = {'atom_type': atom_type,
                             'label': values[node_keys.index('atom')]}
+                    if 'charge' in node_keys:
+                        attr['partial_charge'] = values[node_keys.index('charge')]
                     for key in node_keys:
-                        if key == 'nr' or key == 'atom' or key == 'type':
+                        if key == 'nr' or key == 'atom' or key == 'type' or key == 'charge':
                             continue
                         idx = node_keys.index(key)
                         if idx < len(values):
                             attr[key] = values[idx]
+                    attr['charge_group'] = charge_groups
                     graph.add_node(int(values[node_keys.index('nr')]), **attr)
+
+                    if m.group(3):
+                        try:
+                            group_charges[charge_groups] = float(m.group(3).strip())
+                            charge_groups += 1
+                        except:
+                            pass
 
         if edges:
             if header:
-                edge_keys = re.search(r';(.+);*.*', line)
+                edge_keys = re.search(r';([^;]+)', line)
                 header = False
                 if edge_keys:
                     edge_keys = edge_keys.group(1).split()
@@ -396,13 +521,21 @@ def __itp_to_nx(obj: Any) -> nx.Graph:
                     if not 'aj' in edge_keys:
                         raise ValueError('Missing attribute "aj".')
             elif edge_keys:
-                values = re.search(r'(.+);*.*', line)
+                values = re.search(r'([^;]+)', line)
                 if values:
                     values = values.group(1).split()
                     attr = {}
-                    for key in node_keys:
-                        attr[key] = values[node_keys.index(key) + 2]
-                    graph.add_edge(int(values[0]), int(values[1]), **attr)
+                    for key in edge_keys:
+                        if key == 'ai' or key == 'aj':
+                            continue
+                        attr[key] = values[edge_keys.index(key)]
+                    attr['bond_type'] = BondType.UNKNOWN
+                    graph.add_edge(int(values[edge_keys.index('ai')]), int(values[edge_keys.index('aj')]), **attr)
+
+    if len(group_charges) == 0:
+        group_charges = {0: 0.0}
+    graph.graph['group_charges'] = group_charges
+
     return graph
 
 def convert_from(molecule: Any, type: IOType) -> nx.Graph:

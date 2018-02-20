@@ -54,7 +54,7 @@ lgf
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | **lgf**                                                                     | **networkx**                                                                |
 +=============================================================================+=============================================================================+
-| label2 (str)                                                                | label (str, auto-generated if missing)                                      |
+| label2 (str, auto-generated if missing)                                     | label (str, auto-generated if missing)                                      |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | initColor (int)                                                             | charge_group (int, all atoms in group 0 if missing)                         |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
@@ -65,6 +65,8 @@ lgf
 | **lgf**                                                                     | **networkx**                                                                |
 +=============================================================================+=============================================================================+
 | bondType (int)                                                              | bond_type (:class:`BondType <charge.babel.BondType>`, UNKNOWN if missing)   |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
+| label (int, auto-generated)                                                 | None                                                                        |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 The atom type is mapped from ints to strings according to the index (starting at 1) in :data:`IACM_ELEMENTS <charge.settings.IACM_ELEMENTS>`. group_charges are set to 0.0.
@@ -79,18 +81,18 @@ Bonds in the lgf file are indexed by the label attribute, which is ignored when 
 Example::
 
     @nodes
-    label   label2  atomType
-    1       C1      12
-    2       H1      20
-    3       H2      20
-    4       H3      20
-    5       H4      20
+    label   label2  atomType    initColor
+    1       C1      12          0
+    2       H1      20          0
+    3       H2      20          0
+    4       H3      20          0
+    5       H4      20          0
     @edges
-                    label   
-    1       2       0       
-    1       3       1       
-    1       4       2       
-    1       5       3       
+                    label
+    1       2       0
+    1       3       1
+    1       4       2
+    1       5       3
 
 gml
 ^^^
@@ -102,7 +104,7 @@ gml
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | **gml**                                                                     | **networkx**                                                                |
 +=============================================================================+=============================================================================+
-| group_charge_i (float)                                                      | group_charges (map[int, float], 0.0 if missing)                             |
+| groupchargei (float)                                                        | group_charges (map[int, float], 0.0 if missing)                             |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
@@ -112,7 +114,7 @@ gml
 +=============================================================================+=============================================================================+
 | id (int)                                                                    | node id (int)                                                               |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
-| atom_type (str)                                                             | atom_type/iacm (str)                                                        |
+| atomtype (str)                                                              | atom_type/iacm (str)                                                        |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
@@ -120,9 +122,11 @@ gml
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | **gml**                                                                     | **networkx**                                                                |
 +=============================================================================+=============================================================================+
-| label (str)                                                                 | label (str, auto-generated if missing)                                      |
+| label (str, auto-generated if missing)                                      | label (str, auto-generated if missing)                                      |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
-| charge_group (int)                                                          | charge_group (int, all atoms in group 0 if missing)                         |
+| chargegroup (int)                                                           | charge_group (int, all atoms in group 0 if missing)                         |
++-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
+| partialcharge (float)                                                       | partial_charge                                                              |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
@@ -130,7 +134,7 @@ gml
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | **gml**                                                                     | **networkx**                                                                |
 +=============================================================================+=============================================================================+
-| bond_type (str)                                                             | bond_type (:class:`BondType <charge.babel.BondType>`, UNKNOWN if missing)   |
+| bondtype (str)                                                              | bond_type (:class:`BondType <charge.babel.BondType>`, UNKNOWN if missing)   |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 Allowed strings for the atom_type are the :data:`IACM_ELEMENTS <charge.settings.IACM_ELEMENTS>`. The bond_type string is mapped to its corresponding :class:`BondType <charge.babel.BondType>`. Missing label strings are auto-generated, missing bond_types get mapped to :class:`BondType <charge.babel.BondType>` UNKNOWN.
@@ -138,52 +142,51 @@ Allowed strings for the atom_type are the :data:`IACM_ELEMENTS <charge.settings.
 Example::
 
     graph [
-        group_charge_0 0.0
+        groupcharge0 0.0
         node [
-            id 1
+            id 0
             label "C1"
-            atom_type "C"
+            atomtype "C"
         ]
         node [
-            id 2
+            id 1
             label "H1"
-            atom_type "HC"
+            atomtype "HC"
         ]
         node [
             id 2
             label "H2"
-            atom_type "HC"
+            atomtype "HC"
         ]
         node [
-            id 2
+            id 3
             label "H3"
-            atom_type "HC"
+            atomtype "HC"
         ]
         node [
-            id 2
+            id 4
             label "H4"
-            atom_type "HC"
-        ]
-        node [
-            id 2
-            label "H5"
-            atom_type "HC"
+            atomtype "HC"
         ]
         edge [
-            source 1
+            source 0
+            target 1
+            bondtype "UNKNOWN"
+        ]
+        edge [
+            source 0
             target 2
+            bondtype "UNKNOWN"
         ]
         edge [
-            source 1
+            source 0
             target 3
+            bondtype "UNKNOWN"
         ]
         edge [
-            source 1
+            source 0
             target 4
-        ]
-        edge [
-            source 1
-            target 5
+            bondtype "UNKNOWN"
         ]
     ]
 
@@ -255,7 +258,8 @@ rdkit
 | .html#GetIdx>`_ (int)                                                       |                                                                             |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 | `symbol <http://www.rdkit.org/Python_Docs/rdkit.Chem.rdchem.Atom-class.html | atom_type/iacm (str)                                                        |
-| #GetSymbol>`_ (str)                                                         |                                                                             |
+| #GetSymbol>`_ (str) / `atom_type <http://www.rdkit.org/Python_Docs/         |                                                                             |
+| rdkit.Chem.rdchem.Atom-class.html#GetProp>`_ (str)                          |                                                                             |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
@@ -280,7 +284,7 @@ rdkit
 | rdkit.Chem.rdchem.BondType-class.html>`_)                                   |                                                                             |
 +-----------------------------------------------------------------------------+-----------------------------------------------------------------------------+
 
-Missing label strings are auto-generated. SINGLE, DOUBLE, TRIPLE and AROMATIC bond types are mapped, all else are mapped to UNKNOWN. However, when converting from an rdkit molecule to a networkx graph, the original bond type is preserved in the rdkit_bond_type attribute, which is only exported when converting back to an rdkit molecule.
+Missing label strings are auto-generated. SINGLE, DOUBLE, TRIPLE and AROMATIC bond types are mapped, all else are mapped to UNKNOWN. However, when converting from an rdkit molecule to a networkx graph, the original bond type is preserved in the rdkit_bond_type attribute, which is only exported when converting back to an rdkit molecule. RDKIT does not support :data:`IACM types <charge.settings.IACM_ELEMENTS>`. Therefore, when converting to rdkit, the IACM type is saved in the atom_type property, which takes precedence over the rdkit atom symbol when converting back from rdkit.
 
 
 

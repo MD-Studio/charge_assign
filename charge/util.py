@@ -1,3 +1,7 @@
+from collections import deque
+from typing import Any
+
+import networkx as nx
 
 def print_progress(iteration:int,
                    total:int,
@@ -30,3 +34,40 @@ def print_progress(iteration:int,
 
     if iteration == total:
         print()
+
+
+def bfs_nodes(G: nx.Graph, source: Any, max_depth:int=0):
+    """Iterate over nodes in a breadth-first search.
+
+    The breadth-first search begins at `source` and enqueues the
+    neighbors of newly visited nodes specified by the `neighbors`
+    function.
+
+    Adapted from `generic_bfs_edges <https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/traversal/breadth_first_search.html>`_.
+
+    :param G: NetworkX graph
+    :type G: nx.Graph
+    :param source: starting node for the breadth-first search
+    :type source: Any
+    :param max_depth: maximal depth of the breadth-first search
+    :type max_depth: int
+    """
+    visited = {source}
+    queue = deque([(G.neighbors(source), 1)])
+
+    yield source
+
+    while queue:
+        children, depth = queue[0]
+
+        if max_depth > 0 and depth > max_depth:
+            break
+
+        try:
+            child = next(children)
+            if child not in visited:
+                yield child
+                visited.add(child)
+                queue.append((G.neighbors(child), depth+1))
+        except StopIteration:
+            queue.popleft()

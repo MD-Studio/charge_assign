@@ -1,17 +1,15 @@
 import bisect
+import itertools
 import os
 from collections import defaultdict
 from itertools import groupby
+from multiprocessing import Value
 from multiprocessing.pool import Pool
-from typing import Callable, List
-
-import math
+from typing import Callable
 from zipfile import ZipFile
 
-import itertools
 import msgpack
 import networkx as nx
-from multiprocessing import Value
 
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
@@ -198,7 +196,7 @@ def read(molid: int, data_location: str, iacm_to_elements: bool, nauty: Nauty, e
         if iacm_to_elements:
             for v, data in graph.nodes(data=True):
                 graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-        canon = nauty.canonize(graph, with_core=False)
+        canon = nauty.canonize(graph)
         res.append((graph, canon))
     progress.value += 1
     print_progress(progress.value, total.value, prefix='reading files:')
@@ -213,6 +211,7 @@ def get_charges(graph: nx.Graph, nauty: Nauty, shell: int, iacm_to_elements: boo
     else:
         for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
             charges[key].append(partial_charge)
+    progress.value += 1
     print_progress(progress.value, total.value, prefix='shell %d:' % shell)
     return charges
 

@@ -12,7 +12,7 @@ setup(
         python_requires='>=3.5, <4',
         install_requires=[
                 'msgpack-python>=0.4.8',
-                'networkx>=2.0,<3',
+                'networkx==2.0',
                 'numpy>=1.14.0,<2'
             ],
         keywords = ['Molecules', 'Charges', 'Force field', 'Graph theory'],

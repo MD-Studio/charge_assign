@@ -39,6 +39,7 @@ IACM_ELEMENTS = ['O', 'OM', 'OA',  'OE',  'OW',  'N', 'NT',
                  'FTFE', 'CTFE', 'CHTFE', 'OTFE', 'CUrea',
                  'OUrea', 'NUrea', 'CH3p', 'I', 'CLOpt', 'B',
                  'SE', 'HS14', 'CLAro', 'BROpt']
+"""GROMOS IACM elements"""
 
 # DB_SCHEMA = {
 #     "type": "object",

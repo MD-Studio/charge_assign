@@ -104,4 +104,4 @@ ENV/
 .idea
 
 # Vim
-.swp
+/**/*.swp

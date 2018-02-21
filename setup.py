@@ -15,6 +15,13 @@ setup(
                 'networkx==2.0',
                 'numpy>=1.14.0,<2'
             ],
+        extras_require={
+            'dev': [
+                'pytest',
+                'pytest-pep8',
+                'pytest-cov'
+            ]
+        },
         keywords = ['Molecules', 'Charges', 'Force field', 'Graph theory'],
         classifiers = [
             'Development Status :: 3 - Alpha',

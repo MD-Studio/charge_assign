@@ -65,3 +65,18 @@ cd charge_assign
 pip install .
 ```
 
+## Tests
+
+To run the tests, use
+
+```bash
+pip install -e .[dev]
+```
+
+to install the required dependencies, and then run
+
+```bash
+pytest --cov
+```
+
+to run the test suite.

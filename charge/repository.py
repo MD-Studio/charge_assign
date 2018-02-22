@@ -140,12 +140,10 @@ class Repository:
             isomorphics = list(group)
             if len(isomorphics) > 1:
                 for molid in isomorphics:
-                    self.__iso_iacm[molid] = isomorphics
-        for _, group in groupby(molids, key=lambda molid: canons[molid]):
-            isomorphics = list(group)
-            if len(isomorphics) > 1:
-                for molid in isomorphics:
-                    self.__iso_elem[molid] = isomorphics
+                    if not iacm_to_elements:
+                        self.__iso_iacm[molid] = isomorphics
+                    else:
+                        self.__iso_elem[molid] = isomorphics
 
         for shell in range(1, self.__max_shell + 1):
             if not iacm_to_elements:

@@ -1,7 +1,7 @@
 import hashlib
 import os
 import subprocess
-import tempfile
+from io import BytesIO
 from itertools import groupby
 from typing import Any, Dict, Tuple
 
@@ -19,6 +19,19 @@ class Nauty:
             raise ValueError('Could not find dreadnaut executable at: "%s". Did you install nauty (http://users.cecs.'
                              'anu.edu.au/~bdm/nauty/)?' % executable)
         self.__exe = executable
+        self.__process = subprocess.Popen(
+            [self.__exe],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+            close_fds=True
+        )
+
+    def __del__(self):
+        if hasattr(self, '__process'):
+            if not self.__process.poll():
+                self.__process.terminate()
 
     def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int, color_key='atom_type') -> str:
 
@@ -31,31 +44,30 @@ class Nauty:
 
     def canonize(self, graph: nx.Graph, color_key='atom_type', core:Any=None) -> str:
 
-        with tempfile.TemporaryFile(buffering=0) as tmp:
-            cmd, idx = self.__nauty_input(graph, color_key=color_key)
-            tmp.write(cmd.encode())
-            tmp.seek(0)
+        cmd, idx = self.__nauty_input(graph, color_key=color_key)
 
-            p = subprocess.Popen(
+        if self.__process.poll():
+            self.__process = subprocess.Popen(
                 [self.__exe],
-                shell=True,
-                stdin=tmp,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                bufsize=0,
+                close_fds=True
             )
 
-            out, err = p.communicate()
+        self.__process.stdin.write(cmd.encode())
+        self.__process.stdin.flush()
 
-            if len(err) > 0:
-                raise Exception(err.decode())
-            if len(out) == 0:
-                raise Exception()
+        out = self.__process.stdout.read(1000)
+        while not b'END' in out:
+            out += self.__process.stdout.read(1000)
 
         return self.__nauty_output(out.strip().decode(), graph, idx, color_key, core)
 
     def __nauty_input(self, graph: nx.Graph, color_key:str) -> Tuple[str, Dict[int, Any]]:
         idx = {v:i for i,v in enumerate(graph.nodes())}
-        input_str = ' n={num_atoms} g {edges}. f=[{node_partition}] cxb'.format(
+        input_str = ' n={num_atoms} g {edges}. f=[{node_partition}] cxb"END\n"->>\n'.format(
             num_atoms=graph.number_of_nodes(),
             edges=self.__nauty_edges(graph, idx),
             node_partition=self.__nauty_node_partition(graph, idx, color_key),
@@ -83,7 +95,7 @@ class Nauty:
         nodes = {v: k for k, v in idx.items()}
         lines = [line.strip() for line in nautstr.split('seconds')[-1].strip().split('\n')]
 
-        adj = [[int(val) for val in line[:-1].split(':')[-1].split()] for line in lines[1:]]
+        adj = [[int(val) for val in line[:-1].split(':')[-1].split()] for line in lines if ':' in line]
 
         if core:
             colors, core = list(zip(*map(

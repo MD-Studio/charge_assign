@@ -3,7 +3,7 @@ import warnings
 import networkx as nx
 import numpy
 
-from charge.babel import BondType
+from charge.bond_type import BondType
 from charge.nauty import Nauty
 from charge.repository import Repository
 

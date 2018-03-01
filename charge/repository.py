@@ -24,13 +24,11 @@ class Repository:
                  location: str= REPO_LOCATION,
                  data_location: str=None,
                  data_type: IOType=IOType.LGF,
-                 nauty_executable: str = NAUTY_EXC,
                  min_shell: int=1,
                  max_shell: int=7,
                  processes: int=None) -> None:
 
-        self.__nauty_exe = nauty_executable
-        self.__nauty = Nauty(nauty_executable)
+        self.__nauty = Nauty()
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 
@@ -88,7 +86,7 @@ class Repository:
         for chunk in chunks:
             process = Process(target=read_worker,
                               args=(chunk, data_location, iacm_to_elements, self.__ext, self.__data_type,
-                                    self.__nauty_exe, out_q, progress, total))
+                                    out_q, progress, total))
             pool.append(process)
             process.start()
 
@@ -113,7 +111,7 @@ class Repository:
 
             for chunk in chunks:
                 process = Process(target=charge_worker,
-                                  args=(chunk, shell, iacm_to_elements, self.__nauty_exe, out_q, progress, total))
+                                  args=(chunk, shell, iacm_to_elements, out_q, progress, total))
                 pool.append(process)
                 process.start()
 
@@ -232,9 +230,9 @@ def iter_queue(pool: List[Process], queue: Queue):
 
 
 def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType,
-                nauty_exe:str, out_q:Queue, progress: Value, total: Value):
+                out_q:Queue, progress: Value, total: Value):
 
-    nauty = Nauty(nauty_exe)
+    nauty = Nauty()
 
     for molid in molids:
         with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
@@ -248,10 +246,10 @@ def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, e
         print_progress(progress.value, total.value, prefix='reading files:')
 
 
-def charge_worker(graphs: List[nx.Graph], shell: int, iacm_to_elements: bool, nauty_exe:str,
+def charge_worker(graphs: List[nx.Graph], shell: int, iacm_to_elements: bool,
                   out_q:Queue, progress: Value, total: Value):
 
-    nauty = Nauty(nauty_exe)
+    nauty = Nauty()
 
     for graph in graphs:
         charges = defaultdict(list)

@@ -69,12 +69,7 @@ class Repository:
         if iacm_to_elements:
             print('IACM to element mode...')
 
-        progress = Value('i', 0)
-        total = Value('i', 100)
         out_q = JoinableQueue()
-
-        progress.value = 0
-        total.value = len(molids)
 
         canons = dict()
         graphs = []
@@ -86,16 +81,17 @@ class Repository:
         for chunk in chunks:
             process = Process(target=read_worker,
                               args=(chunk, data_location, iacm_to_elements, self.__ext, self.__data_type,
-                                    out_q, progress, total))
+                                    out_q))
             pool.append(process)
             process.start()
 
+        progress = 0
         for molid, graph, canon in iter_queue(pool, out_q):
             graphs.append(graph)
             canons[molid] = canon
 
-        if progress.value != total.value:
-            print_progress(total.value, total.value, prefix='reading files:')
+            progress += 1
+            print_progress(progress, len(molids), 'reading files:')
 
         for worker in pool:
             worker.join()
@@ -103,27 +99,25 @@ class Repository:
                 worker.terminate()
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            progress.value = 0
-            total.value = len(graphs)
             out_q = JoinableQueue()
 
             chunks = map(lambda i: graphs[i:i + chunksize], range(0, len(graphs), chunksize))
 
             for chunk in chunks:
                 process = Process(target=charge_worker,
-                                  args=(chunk, shell, iacm_to_elements, out_q, progress, total))
+                                  args=(chunk, shell, iacm_to_elements, out_q))
                 pool.append(process)
                 process.start()
 
+            progress = 0
             for c in iter_queue(pool, out_q):
                 for key, values in c.items():
                     if not iacm_to_elements:
                         self.charges_iacm[shell][key] += values
                     else:
                         self.charges_elem[shell][key] += values
-
-            if progress.value != total.value:
-                print_progress(total.value, total.value, prefix='shell %d:' % shell)
+                progress += 1
+                print_progress(progress, len(graphs), prefix='shell %d:' % shell)
 
             for worker in pool:
                 worker.join()
@@ -230,7 +224,7 @@ def iter_queue(pool: List[Process], queue: Queue):
 
 
 def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType,
-                out_q:Queue, progress: Value, total: Value):
+                out_q:Queue):
 
     nauty = Nauty()
 
@@ -242,12 +236,10 @@ def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, e
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
             canon = nauty.canonize(graph)
             out_q.put((molid, graph, canon))
-        progress.value += 1
-        print_progress(progress.value, total.value, prefix='reading files:')
 
 
 def charge_worker(graphs: List[nx.Graph], shell: int, iacm_to_elements: bool,
-                  out_q:Queue, progress: Value, total: Value):
+                  out_q:Queue):
 
     nauty = Nauty()
 
@@ -261,9 +253,6 @@ def charge_worker(graphs: List[nx.Graph], shell: int, iacm_to_elements: bool,
             for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
                 charges[key].append(partial_charge)
         out_q.put(charges)
-
-        progress.value += 1
-        print_progress(progress.value, total.value, prefix='shell %d:' % shell)
 
 
 def iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):

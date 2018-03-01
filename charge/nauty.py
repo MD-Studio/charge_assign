@@ -29,9 +29,15 @@ class Nauty:
         )
 
     def __del__(self):
-        if hasattr(self, '__process'):
+        try:
             if not self.__process.poll():
-                self.__process.terminate()
+                self.__process.stdin.write('q'.encode('utf-8'))
+                self.__process.stdin.close()
+                self.__process.stdout.close()
+                self.__process.stderr.close()
+                self.__process.wait(timeout=1)
+        except ValueError:
+            pass
 
     def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int, color_key='atom_type') -> str:
 

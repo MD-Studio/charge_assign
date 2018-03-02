@@ -4,7 +4,7 @@ from collections import defaultdict
 from itertools import groupby
 from multiprocessing import Value, Process, JoinableQueue
 from queue import Queue, Empty
-from typing import Callable, List
+from typing import Callable, Dict, List, Tuple
 from zipfile import ZipFile
 
 import math
@@ -70,51 +70,77 @@ class Repository:
         if iacm_to_elements:
             print('IACM to element mode...')
 
-        canons = dict()
-        graphs = []
 
-        with MultiProcessor(ReadWorker, (data_location, iacm_to_elements, self.__ext, self.__data_type)) as mp:
-            for molid, graph, canon in mp.processed(molids):
-                graphs.append(graph)
-                canons[molid] = canon
+        # load graphs
+        graphs = self.__read_graphs(molids, data_location, self.__ext, self.__data_type)
+        if iacm_to_elements:
+            for _, graph in graphs:
+                for v, data in graph.nodes(data=True):
+                    graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
+
+        # generate charges
+        if not iacm_to_elements:
+            self.charges_iacm = self.__generate_charges(graphs)
+        else:
+            self.charges_elem = self.__generate_charges(graphs)
+
+        # generate isomorphics
+        canons = self.__make_canons(graphs)
+
+        if not iacm_to_elements:
+            self.__iso_iacm = self.__make_isomorphics(molids, canons)
+        else:
+            self.__iso_elem = self.__make_isomorphics(molids, canons)
+
+
+    def __read_graphs(self, molids: List[int], data_location: str, ext: str, data_type: IOType) -> List[Tuple[int, nx.Graph]]:
+        graphs = []
+        with MultiProcessor(ReadWorker, (data_location, ext, data_type)) as mp:
+            for molid, graph in mp.processed(molids):
+                graphs.append((molid, graph))
 
                 if len(graphs) % 20 == 0 or len(graphs) == len(molids):
                     print_progress(len(graphs), len(molids), 'reading files:')
+
+        return graphs
+
+
+    def __generate_charges(self, graphs: List[Tuple[int, nx.Graph]]) -> Dict[int, Dict[str, List[float]]]:
+        charges = defaultdict(lambda: defaultdict(list))
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
             progress = 0
             with MultiProcessor(ChargeWorker, shell) as mp:
                 for c in mp.processed(graphs):
                     for key, values in c.items():
-                        if not iacm_to_elements:
-                            self.charges_iacm[shell][key] += values
-                        else:
-                            self.charges_elem[shell][key] += values
+                       charges[shell][key] += values
                     progress += 1
                     if progress % 20 == 0 or progress == len(graphs):
                         print_progress(progress, len(graphs), prefix='shell %d:' % shell)
 
+            for key, values in charges[shell].items():
+                charges[shell][key] = sorted(values)
 
-        if not iacm_to_elements:
-            self.__iso_iacm = defaultdict(list)
-        else:
-            self.__iso_elem = defaultdict(list)
+        return charges
+
+
+    def __make_isomorphics(self, molids: List[int], canons: Dict[int, str]) -> Dict[int, List[int]]:
+        isomorphics = defaultdict(list)
         for _, group in groupby(molids, key=lambda molid: canons[molid]):
-            isomorphics = list(group)
-            if len(isomorphics) > 1:
-                for molid in isomorphics:
-                    if not iacm_to_elements:
-                        self.__iso_iacm[molid] = isomorphics
-                    else:
-                        self.__iso_elem[molid] = isomorphics
+            isogroup = list(group)
+            if len(isogroup) > 1:
+                for molid in isogroup:
+                    isomorphics[molid] = isogroup
+        return isomorphics
 
-        for shell in range(1, self.__max_shell + 1):
-            if not iacm_to_elements:
-                for key, values in self.charges_iacm[shell].items():
-                    self.charges_iacm[shell][key] = sorted(values)
-            else:
-                for key, values in self.charges_elem[shell].items():
-                    self.charges_elem[shell][key] = sorted(values)
+
+    def __make_canons(self, graphs: List[Tuple[int, nx.Graph]]) -> Dict[int, str]:
+        canons = dict()
+        with MultiProcessor(CanonicalizationWorker) as mp:
+            for molid, canon in mp.processed(graphs):
+                canons[molid] = canon
+        return canons
+
 
     def __iterate(self, data_location: str, molid: int,
                   callable_iacm: Callable[[int, str, float], None],
@@ -177,23 +203,24 @@ class Repository:
 
 
 class ReadWorker:
-    def __init__(self, data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType):
+    def __init__(self, data_location: str, ext: str, data_type: IOType):
         self.__data_location = data_location
-        self.__iacm_to_elements = iacm_to_elements
         self.__ext = ext
         self.__data_type = data_type
-
-        self.__nauty = Nauty()
 
 
     def process(self, molid: int) -> None:
         with open(os.path.join(self.__data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
             graph = convert_from(f.read(), self.__data_type)
-            if self.__iacm_to_elements:
-                for v, data in graph.nodes(data=True):
-                    graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-            canon = self.__nauty.canonize(graph)
-            return molid, graph, canon
+            return molid, graph
+
+
+class CanonicalizationWorker:
+    def __init__(self):
+        self.__nauty = Nauty()
+
+    def process(self, molid: int, graph: nx.Graph) -> str:
+        return molid, self.__nauty.canonize(graph)
 
 
 class ChargeWorker:
@@ -202,7 +229,7 @@ class ChargeWorker:
         self.__nauty = Nauty()
 
 
-    def process(self, graph: nx.Graph) -> None:
+    def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
         charges = defaultdict(list)
 
         for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, self.__shell):

@@ -15,6 +15,7 @@ import time
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP, NAUTY_EXC
+from charge.multiprocessor import MultiProcessor
 from charge.util import print_progress
 
 
@@ -69,60 +70,30 @@ class Repository:
         if iacm_to_elements:
             print('IACM to element mode...')
 
-        out_q = JoinableQueue()
-
         canons = dict()
         graphs = []
-        pool = []
 
-        chunksize = int(math.ceil(len(molids) / processes))
-        chunks = map(lambda i: molids[i:i + chunksize], range(0, len(molids), chunksize))
+        with MultiProcessor(ReadWorker, (data_location, iacm_to_elements, self.__ext, self.__data_type)) as mp:
+            for molid, graph, canon in mp.processed(molids):
+                graphs.append(graph)
+                canons[molid] = canon
 
-        for chunk in chunks:
-            process = Process(target=read_worker,
-                              args=(chunk, data_location, iacm_to_elements, self.__ext, self.__data_type,
-                                    out_q))
-            pool.append(process)
-            process.start()
-
-        progress = 0
-        for molid, graph, canon in iter_queue(pool, out_q):
-            graphs.append(graph)
-            canons[molid] = canon
-
-            progress += 1
-            print_progress(progress, len(molids), 'reading files:')
-
-        for worker in pool:
-            worker.join()
-            if worker.exitcode is None:
-                worker.terminate()
+                if len(graphs) % 20 == 0 or len(graphs) == len(molids):
+                    print_progress(len(graphs), len(molids), 'reading files:')
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            out_q = JoinableQueue()
-
-            chunks = map(lambda i: graphs[i:i + chunksize], range(0, len(graphs), chunksize))
-
-            for chunk in chunks:
-                process = Process(target=charge_worker,
-                                  args=(chunk, shell, iacm_to_elements, out_q))
-                pool.append(process)
-                process.start()
-
             progress = 0
-            for c in iter_queue(pool, out_q):
-                for key, values in c.items():
-                    if not iacm_to_elements:
-                        self.charges_iacm[shell][key] += values
-                    else:
-                        self.charges_elem[shell][key] += values
-                progress += 1
-                print_progress(progress, len(graphs), prefix='shell %d:' % shell)
+            with MultiProcessor(ChargeWorker, shell) as mp:
+                for c in mp.processed(graphs):
+                    for key, values in c.items():
+                        if not iacm_to_elements:
+                            self.charges_iacm[shell][key] += values
+                        else:
+                            self.charges_elem[shell][key] += values
+                    progress += 1
+                    if progress % 20 == 0 or progress == len(graphs):
+                        print_progress(progress, len(graphs), prefix='shell %d:' % shell)
 
-            for worker in pool:
-                worker.join()
-                if worker.exitcode is None:
-                    worker.terminate()
 
         if not iacm_to_elements:
             self.__iso_iacm = defaultdict(list)
@@ -205,54 +176,39 @@ class Repository:
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
 
-def iter_queue(pool: List[Process], queue: Queue):
-    live_workers = list(pool)
-    while live_workers:
-        try:
-            while True:
-                yield queue.get(block=False)
-        except Empty:
-            pass
+class ReadWorker:
+    def __init__(self, data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType):
+        self.__data_location = data_location
+        self.__iacm_to_elements = iacm_to_elements
+        self.__ext = ext
+        self.__data_type = data_type
 
-        time.sleep(0.1)
-        if not queue.empty():
-            continue
-        live_workers = [p for p in live_workers if p.is_alive()]
-
-    while not queue.empty():
-        yield queue.get()
+        self.__nauty = Nauty()
 
 
-def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType,
-                out_q:Queue):
-
-    nauty = Nauty()
-
-    for molid in molids:
-        with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
-            graph = convert_from(f.read(), data_type)
-            if iacm_to_elements:
+    def process(self, molid: int) -> None:
+        with open(os.path.join(self.__data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
+            graph = convert_from(f.read(), self.__data_type)
+            if self.__iacm_to_elements:
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-            canon = nauty.canonize(graph)
-            out_q.put((molid, graph, canon))
+            canon = self.__nauty.canonize(graph)
+            return molid, graph, canon
 
 
-def charge_worker(graphs: List[nx.Graph], shell: int, iacm_to_elements: bool,
-                  out_q:Queue):
+class ChargeWorker:
+    def __init__(self, shell: int):
+        self.__shell = shell
+        self.__nauty = Nauty()
 
-    nauty = Nauty()
 
-    for graph in graphs:
+    def process(self, graph: nx.Graph) -> None:
         charges = defaultdict(list)
 
-        if not iacm_to_elements:
-            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
-                charges[key].append(partial_charge)
-        else:
-            for key, partial_charge in iter_atomic_fragments(graph, nauty, shell):
-                charges[key].append(partial_charge)
-        out_q.put(charges)
+        for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, self.__shell):
+            charges[key].append(partial_charge)
+
+        return charges
 
 
 def iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):

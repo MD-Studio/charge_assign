@@ -22,8 +22,6 @@ from charge.util import print_progress
 class Repository:
 
     def __init__(self,
-                 data_location: str=None,
-                 data_type: IOType=IOType.LGF,
                  min_shell: int=1,
                  max_shell: int=7) -> None:
 
@@ -34,30 +32,26 @@ class Repository:
         self.charges_iacm = defaultdict(lambda: defaultdict(list))
         self.charges_elem = defaultdict(lambda: defaultdict(list))
 
-        if data_type == IOType.LGF:
-            self.__ext = '.lgf'
-        elif data_type == IOType.GML:
-            self.__ext = '.gml'
-        elif data_type == IOType.ITP:
-            self.__ext = '.itp'
-        else:
-            raise ValueError('Unsupported file type: {}'.format(data_type.name))
-        self.__data_type = data_type
+    @staticmethod
+    def create_from(
+            data_location: str,
+            data_type: IOType=IOType.LGF,
+            min_shell: int=1,
+            max_shell: int=7) -> None:
 
-        if data_location:
-            self.__create(data_location)
+        repo = Repository(min_shell, max_shell)
+        extension = data_type.get_extension()
 
-    def __create(self, data_location: str) -> None:
-        molids = [int(fn.replace(self.__ext, ''))
-                  for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
+        molids = [int(fn.replace(extension, ''))
+                  for fn in os.listdir(data_location) if fn.endswith(extension)]
 
         # load graphs
-        graphs = self.__read_graphs(molids, data_location, self.__ext, self.__data_type)
+        graphs = repo.__read_graphs(molids, data_location, extension, data_type)
 
         # iacm atom types
-        self.charges_iacm = self.__generate_charges(graphs)
-        canons = self.__make_canons(graphs)
-        self.__iso_iacm = self.__make_isomorphics(molids, canons)
+        repo.charges_iacm = repo.__generate_charges(graphs)
+        canons = repo.__make_canons(graphs)
+        repo.__iso_iacm = repo.__make_isomorphics(molids, canons)
 
         # convert to plain elements
         for _, graph in graphs:
@@ -65,12 +59,14 @@ class Repository:
                 graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
 
         # plain elements
-        self.charges_elem = self.__generate_charges(graphs)
-        canons = self.__make_canons(graphs)
-        self.__iso_elem = self.__make_isomorphics(molids, canons)
+        repo.charges_elem = repo.__generate_charges(graphs)
+        canons = repo.__make_canons(graphs)
+        repo.__iso_elem = repo.__make_isomorphics(molids, canons)
+
+        return repo
 
     @staticmethod
-    def read(self, location: str = REPO_LOCATION):
+    def read(location: str = REPO_LOCATION):
         repo = Repository()
         with ZipFile(location, mode='r') as zf:
             repo.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
@@ -88,7 +84,7 @@ class Repository:
             zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
-    def add(self, data_location: str, molid: int):
+    def add(self, data_location: str, molid: int, data_type: IOType):
         def a(shell, key, partial_charge, repo):
             if not shell in repo:
                 repo[shell] = dict()
@@ -96,12 +92,12 @@ class Repository:
                 repo[shell][key] = []
             bisect.insort_left(repo[shell][key], partial_charge)
 
-        self.__iterate(data_location, molid,
+        self.__iterate(data_location, molid, data_type,
             lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_iacm),
             lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_elem)
         )
 
-    def subtract(self,  data_location: str, molid: int):
+    def subtract(self, data_location: str, molid: int, data_type: IOType):
         def s(shell, key, partial_charge, repo):
             repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
             if len(repo[shell][key]) == 0:
@@ -109,7 +105,7 @@ class Repository:
             if len(repo[shell]) == 0:
                 del repo[shell]
 
-        self.__iterate(data_location, molid,
+        self.__iterate(data_location, molid, data_type,
             lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_iacm),
             lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
 
@@ -163,7 +159,7 @@ class Repository:
         return canons
 
 
-    def __iterate(self, data_location: str, molid: int,
+    def __iterate(self, data_location: str, molid: int, data_type: IOType,
                   callable_iacm: Callable[[int, str, float], None],
                   callable_elem: Callable[[int, str, float], None]):
         ids_iacm = {molid}
@@ -173,16 +169,18 @@ class Repository:
         if molid in self.__iso_elem:
             ids_iacm.union(set(self.__iso_elem[molid]))
 
+        extension = data_type.get_extension()
+
         for molid in ids_iacm:
-            with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
-                graph = convert_from(f.read(), self.__data_type)
+            with open(os.path.join(data_location, '%d%s' % (molid, extension)), 'r') as f:
+                graph = convert_from(f.read(), data_type)
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_iacm(shell, key, partial_charge)
 
         for molid in ids_elem:
-            with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
-                graph = convert_from(f.read(), self.__data_type)
+            with open(os.path.join(data_location, '%d%s' % (molid, extension)), 'r') as f:
+                graph = convert_from(f.read(), data_type)
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 for shell in range(1, self.__max_shell + 1):

@@ -25,6 +25,22 @@ class IOType(Enum):
     PYBEL = 5
     ITP = 6
 
+    def get_extension(self) -> str:
+        """Returns the corresponding filename extension, including
+        the period.
+
+        Raises ValueError for RDKIT, OPENBABEL and PYBEL, as these
+        support multiple formats."""
+        ext = {
+                IOType.LGF: ".lgf",
+                IOType.GML: ".gml",
+                IOType.ITP: ".itp",
+                }
+        try:
+            return ext[self]
+        except KeyError:
+            raise ValueError('Unsupported file type: {}'.format(self.name))
+
 
 class BondType(Enum):
     """Supported chemical bond types."""

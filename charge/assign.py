@@ -2,6 +2,7 @@
 import networkx as nx
 from pulp import PULP_CBC_CMD, GLPK_CMD, COIN_CMD, CPLEX_CMD, GUROBI_CMD
 
+from charge.bond_type import BondType
 from charge import util
 from charge.nauty import Nauty
 from charge.repository import Repository

@@ -25,8 +25,7 @@ class Repository:
                  data_location: str=None,
                  data_type: IOType=IOType.LGF,
                  min_shell: int=1,
-                 max_shell: int=7,
-                 processes: int=None) -> None:
+                 max_shell: int=7) -> None:
 
         self.__nauty = Nauty()
         self.__min_shell = max(min_shell, 0)
@@ -46,14 +45,9 @@ class Repository:
         self.__data_type = data_type
 
         if data_location:
-            cpus = os.cpu_count()
-            if processes:
-                processes = min(max(processes-1, 1), cpus-1)
-            else:
-                processes = cpus-1
-            self.__create(data_location, processes)
+            self.__create(data_location)
 
-    def __create(self, data_location: str, processes:int) -> None:
+    def __create(self, data_location: str) -> None:
         molids = [int(fn.replace(self.__ext, ''))
                   for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
 

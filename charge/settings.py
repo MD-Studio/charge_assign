@@ -11,6 +11,11 @@ for path in os.environ["PATH"].split(os.pathsep):
 else:
     NAUTY_EXC = os.path.expanduser('~/nauty26r7/dreadnaut')
 
+SOLVER_MAX_SECONDS = 60
+DEFAULT_TOTAL_CHARGE = 0
+DEFAULT_TOTAL_CHARGE_DIFF = 0.01
+MAX_BINS = 25
+
 REPO_LOCATION='atb.zip'
 
 IACM_MAP = dict([('O', 'O'), ('OM', 'O'), ('OA', 'O'), ('OE', 'O'), ('OW', 'O'), ('OMet', 'O'), ('ODmso', 'O'),
@@ -26,7 +31,7 @@ IACM_MAP = dict([('O', 'O'), ('OM', 'O'), ('OA', 'O'), ('OE', 'O'), ('OW', 'O'),
                  ('CL', 'Cl'), ('CL-', 'Cl'), ('CLChl', 'Cl'), ('CLCl4', 'Cl'), ('CLOpt', 'Cl'), ('CLAro', 'Cl'),
                  ('BR', 'Br'), ('BROpt', 'Br'),
                  ('NA+', 'Na'), ('I', 'I'), ('B', 'B'), ('SE', 'Se'), ('FE', 'Fe'), ('ZN2+', 'Zn'), ('MG2+', 'Mg'),
-                 ('CA2+', 'Ca'), ('P,SI', 'P'), ('AR', 'Si')])
+                 ('CA2+', 'Ca'), ('P,SI', 'P'), ('AR', 'Ar')])
 
 IACM_ELEMENTS = ['O', 'OM', 'OA',  'OE',  'OW',  'N', 'NT',
                  'NL', 'NR', 'NZ', 'NE', 'C', 'CH0',

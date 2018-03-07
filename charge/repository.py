@@ -1,20 +1,20 @@
 import bisect
+import math
 import os
+import time
 from collections import defaultdict
 from itertools import groupby
 from multiprocessing import Value, Process, JoinableQueue
 from queue import Queue, Empty
 from typing import Callable, List
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_DEFLATED
 
-import math
 import msgpack
 import networkx as nx
-import time
 
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
-from charge.settings import REPO_LOCATION, IACM_MAP, NAUTY_EXC
+from charge.settings import REPO_LOCATION, IACM_MAP
 from charge.util import print_progress
 
 
@@ -24,13 +24,13 @@ class Repository:
                  location: str= REPO_LOCATION,
                  data_location: str=None,
                  data_type: IOType=IOType.LGF,
-                 nauty_executable: str = NAUTY_EXC,
+                 nauty: Nauty = None,
                  min_shell: int=1,
                  max_shell: int=7,
                  processes: int=None) -> None:
 
-        self.__nauty_exe = nauty_executable
-        self.__nauty = Nauty(nauty_executable)
+        self.__nauty = nauty or Nauty()
+        self.__nauty_exe = self.__nauty.exe
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 
@@ -65,7 +65,7 @@ class Repository:
                 self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
-        molids = [int(fn.replace(self.__ext, ''))
+        molids = [fn.replace(self.__ext, '')
                   for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
 
         if iacm_to_elements:
@@ -145,7 +145,7 @@ class Repository:
                     else:
                         self.__iso_elem[molid] = isomorphics
 
-        for shell in range(1, self.__max_shell + 1):
+        for shell in range(self.__min_shell, self.__max_shell + 1):
             if not iacm_to_elements:
                 for key, values in self.charges_iacm[shell].items():
                     self.charges_iacm[shell][key] = sorted(values)
@@ -166,7 +166,7 @@ class Repository:
         for molid in ids_iacm:
             with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
                 graph = convert_from(f.read(), self.__data_type)
-                for shell in range(1, self.__max_shell + 1):
+                for shell in range(self.__min_shell, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_iacm(shell, key, partial_charge)
 
@@ -175,7 +175,7 @@ class Repository:
                 graph = convert_from(f.read(), self.__data_type)
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-                for shell in range(1, self.__max_shell + 1):
+                for shell in range(self.__min_shell, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
 
@@ -205,7 +205,7 @@ class Repository:
             lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
 
     def write(self, out: str):
-        with ZipFile(out, mode='w') as zf:
+        with ZipFile(out, mode='w', compression=ZIP_DEFLATED) as zf:
             zf.writestr('meta', msgpack.packb((self.__min_shell, self.__max_shell)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
@@ -213,7 +213,7 @@ class Repository:
             zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
 
-def iter_queue(pool: List[Process], queue: Queue):
+def iter_queue(pool: List[Process], queue: Queue, sleep: float=0.1):
     live_workers = list(pool)
     while live_workers:
         try:
@@ -222,7 +222,7 @@ def iter_queue(pool: List[Process], queue: Queue):
         except Empty:
             pass
 
-        time.sleep(0.1)
+        time.sleep(sleep)
         if not queue.empty():
             continue
         live_workers = [p for p in live_workers if p.is_alive()]
@@ -231,13 +231,13 @@ def iter_queue(pool: List[Process], queue: Queue):
         yield queue.get()
 
 
-def read_worker(molids: List[int], data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType,
+def read_worker(molids: List, data_location: str, iacm_to_elements: bool, ext: str, data_type: IOType,
                 nauty_exe:str, out_q:Queue, progress: Value, total: Value):
 
     nauty = Nauty(nauty_exe)
 
     for molid in molids:
-        with open(os.path.join(data_location, '%d%s' % (molid, ext)), 'r') as f:
+        with open(os.path.join(data_location, '{}{}'.format(molid, ext)), 'r') as f:
             graph = convert_from(f.read(), data_type)
             if iacm_to_elements:
                 for v, data in graph.nodes(data=True):

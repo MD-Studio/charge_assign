@@ -3,6 +3,8 @@ import os
 import sys
 from typing import Any, Generator, List, Tuple, Type
 
+from charge.util import print_progress
+
 class _Stop:
     pass
 
@@ -75,7 +77,7 @@ class MultiProcessor:
         self.shutdown()
 
 
-    def processed(self, items: List) -> Generator:
+    def processed(self, items: List, progress_label: str=None) -> Generator:
         """
         Processes the given items in random order.
 
@@ -86,6 +88,8 @@ class MultiProcessor:
 
         Args:
             items: A list of items to process.
+            progress_label: Label for printed progress information. \
+                    Set to None or omit to not print progress.
 
         Returns:
             A list of results, in arbitrary order.
@@ -104,7 +108,8 @@ class MultiProcessor:
             if num_results < len(items):
                 yield self.__out_queue.get()
                 num_results += 1
-
+                if progress_label is not None:
+                    print_progress(num_results, len(items), progress_label)
 
     def shutdown(self) -> None:
         """

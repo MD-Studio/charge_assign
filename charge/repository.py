@@ -16,7 +16,6 @@ from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP, NAUTY_EXC
 from charge.multiprocessor import MultiProcessor
-from charge.util import print_progress
 
 
 class Repository:
@@ -40,6 +39,7 @@ class Repository:
                  min_shell: int=1,
                  max_shell: int=7) -> None:
 
+        self.__nauty = Nauty()
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 
@@ -194,11 +194,8 @@ class Repository:
         graphs = []
         with MultiProcessor(
                 _ReadWorker, (data_location, ext, data_type)) as mp:
-            for molid, graph in mp.processed(molids):
+            for molid, graph in mp.processed(molids, 'reading files'):
                 graphs.append((molid, graph))
-
-                if len(graphs) % 20 == 0 or len(graphs) == len(molids):
-                    print_progress(len(graphs), len(molids), 'reading files:')
 
         return graphs
 
@@ -210,16 +207,10 @@ class Repository:
         charges = defaultdict(lambda: defaultdict(list))
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            progress = 0
             with MultiProcessor(_ChargeWorker, shell) as mp:
-                for c in mp.processed(graphs):
+                for c in mp.processed(graphs, 'shell %d' % shell):
                     for key, values in c.items():
                         charges[shell][key] += values
-                    progress += 1
-                    if progress % 20 == 0 or progress == len(graphs):
-                        print_progress(
-                                progress, len(graphs),
-                                prefix='shell %d:' % shell)
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
             for key, values in charges[shell].items():

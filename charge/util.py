@@ -3,12 +3,15 @@ from typing import Any
 
 import networkx as nx
 
+from charge.babel import BondType
+
+
 def print_progress(iteration:int,
                    total:int,
                    prefix:str='',
                    suffix:str='',
                    decimals:int=1,
-                   length:int=100,
+                   length:int=50,
                    fill:str='#') -> None:
     """Call in a loop to create terminal progress bar
     
@@ -30,7 +33,7 @@ def print_progress(iteration:int,
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = '', flush=True)
+    print('\r%s |%s| %s%% %s\033[K' % (prefix, bar, percent, suffix), end = '', flush=True)
 
     if iteration == total:
         print()
@@ -71,3 +74,66 @@ def bfs_nodes(G: nx.Graph, source: Any, max_depth:int=0):
                 queue.append((G.neighbors(child), depth+1))
         except StopIteration:
             queue.popleft()
+
+
+def iacmize(graph: nx.Graph) -> nx.Graph:
+    def aromatic_neighbors(u) -> list:
+        return list(filter(lambda v: 'bond_type' in graph[u][v] and graph[u][v]['bond_type'] == BondType.AROMATIC,
+                           graph.neighbors(u)))
+
+    for atom in graph.nodes():
+        element = graph.node[atom]['atom_type']
+
+        bas = list(graph.neighbors(atom))
+        if element == 'C':
+            bhs = list(filter(lambda a: graph.node[a]['atom_type'] == 'H', bas))
+            if len(bas) == 4 and len(bhs) == 0:
+                graph.node[atom]['iacm'] = 'CH0'
+            else:
+                graph.node[atom]['iacm'] = 'C'
+        elif element == 'H':
+            if bas and graph.node[bas[0]]['atom_type'] == 'C':
+                graph.node[atom]['iacm'] = 'HC'
+            else:
+                graph.node[atom]['iacm'] = 'H'
+        elif element == 'O':
+            if len(list(filter(lambda a: graph.node[a]['atom_type'] == 'C', bas))) == len(bas) and len(bas) > 1:
+                graph.node[atom]['iacm'] = 'OE'
+            elif len(bas) > 1:
+                graph.node[atom]['iacm'] = 'OA'
+            elif bas and len(list(filter(lambda a: graph.node[a]['atom_type'] == 'O' and \
+                            len(list(graph.neighbors(a))) == 1, graph.neighbors(bas[0])))) > 1 and \
+                            bas != aromatic_neighbors(atom):
+                graph.node[atom]['iacm'] = 'OM'
+            else:
+                graph.node[atom]['iacm'] = 'O'
+        elif element == 'N':
+            if len(bas) > 3:
+                graph.node[atom]['iacm'] = 'NL'
+            elif len(bas) == 1:
+                graph.node[atom]['iacm'] = 'NR'
+            elif len(aromatic_neighbors(atom)) > 1:
+                graph.node[atom]['iacm'] = 'NR'
+            elif len(list(filter(lambda a: graph.node[a]['atom_type'] == 'H', bas))) < 2:
+                graph.node[atom]['iacm'] = 'N'
+            else:
+                graph.node[atom]['iacm'] = 'NT'
+        elif element == 'S':
+            if len(bas) > 2:
+                graph.node[atom]['iacm'] = 'SDmso'
+            else:
+                graph.node[atom]['iacm'] = 'S'
+        elif element == 'P':
+            graph.node[atom]['iacm'] = 'P,SI'
+        elif element == 'Si':
+            graph.node[atom]['iacm'] = 'AR'
+        elif element == 'F':
+            graph.node[atom]['iacm'] = 'F'
+        elif element == 'Cl':
+            graph.node[atom]['iacm'] = 'CL'
+        elif element == 'Br':
+            graph.node[atom]['iacm'] = 'BR'
+        else:
+            graph.node[atom]['iacm'] = element
+
+    return graph

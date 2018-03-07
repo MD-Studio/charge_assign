@@ -53,7 +53,6 @@ class Repository:
             else:
                 processes = cpus-1
             self.__create(data_location, processes)
-            self.__create(data_location, processes, iacm_to_elements=True)
 
         else:
             with ZipFile(location, mode='r') as zf:
@@ -63,35 +62,27 @@ class Repository:
                 self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
                 self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
-    def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
+    def __create(self, data_location: str, processes:int) -> None:
         molids = [int(fn.replace(self.__ext, ''))
                   for fn in os.listdir(data_location) if fn.endswith(self.__ext)]
 
-        if iacm_to_elements:
-            print('IACM to element mode...')
-
-
         # load graphs
         graphs = self.__read_graphs(molids, data_location, self.__ext, self.__data_type)
-        if iacm_to_elements:
-            for _, graph in graphs:
-                for v, data in graph.nodes(data=True):
-                    graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
 
-        # generate charges
-        if not iacm_to_elements:
-            self.charges_iacm = self.__generate_charges(graphs)
-        else:
-            self.charges_elem = self.__generate_charges(graphs)
-
-        # generate isomorphics
+        # iacm atom types
+        self.charges_iacm = self.__generate_charges(graphs)
         canons = self.__make_canons(graphs)
+        self.__iso_iacm = self.__make_isomorphics(molids, canons)
 
-        if not iacm_to_elements:
-            self.__iso_iacm = self.__make_isomorphics(molids, canons)
-        else:
-            self.__iso_elem = self.__make_isomorphics(molids, canons)
+        # convert to plain elements
+        for _, graph in graphs:
+            for v, data in graph.nodes(data=True):
+                graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
 
+        # plain elements
+        self.charges_elem = self.__generate_charges(graphs)
+        canons = self.__make_canons(graphs)
+        self.__iso_elem = self.__make_isomorphics(molids, canons)
 
     def __read_graphs(self, molids: List[int], data_location: str, ext: str, data_type: IOType) -> List[Tuple[int, nx.Graph]]:
         graphs = []
@@ -118,6 +109,7 @@ class Repository:
                     if progress % 20 == 0 or progress == len(graphs):
                         print_progress(progress, len(graphs), prefix='shell %d:' % shell)
 
+        for shell in range(self.__min_shell, self.__max_shell + 1):
             for key, values in charges[shell].items():
                 charges[shell][key] = sorted(values)
 

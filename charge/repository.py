@@ -22,7 +22,6 @@ from charge.util import print_progress
 class Repository:
 
     def __init__(self,
-                 location: str= REPO_LOCATION,
                  data_location: str=None,
                  data_type: IOType=IOType.LGF,
                  min_shell: int=1,
@@ -53,14 +52,6 @@ class Repository:
             else:
                 processes = cpus-1
             self.__create(data_location, processes)
-
-        else:
-            with ZipFile(location, mode='r') as zf:
-                self.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
-                self.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
-                self.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
-                self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
-                self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, processes:int) -> None:
         molids = [int(fn.replace(self.__ext, ''))
@@ -159,6 +150,17 @@ class Repository:
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
+
+    @staticmethod
+    def read(self, location: str = REPO_LOCATION):
+        repo = Repository()
+        with ZipFile(location, mode='r') as zf:
+            repo.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
+            repo.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
+            repo.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
+            repo.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
+            repo.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
+        return repo
 
     def add(self, data_location: str, molid: int):
         def a(shell, key, partial_charge, repo):

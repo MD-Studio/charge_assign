@@ -69,6 +69,50 @@ class Repository:
         canons = self.__make_canons(graphs)
         self.__iso_elem = self.__make_isomorphics(molids, canons)
 
+    @staticmethod
+    def read(self, location: str = REPO_LOCATION):
+        repo = Repository()
+        with ZipFile(location, mode='r') as zf:
+            repo.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
+            repo.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
+            repo.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
+            repo.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
+            repo.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
+        return repo
+
+    def write(self, out: str):
+        with ZipFile(out, mode='w') as zf:
+            zf.writestr('meta', msgpack.packb((self.__min_shell, self.__max_shell)))
+            zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
+            zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
+            zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
+            zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
+
+    def add(self, data_location: str, molid: int):
+        def a(shell, key, partial_charge, repo):
+            if not shell in repo:
+                repo[shell] = dict()
+            if not key in repo[shell]:
+                repo[shell][key] = []
+            bisect.insort_left(repo[shell][key], partial_charge)
+
+        self.__iterate(data_location, molid,
+            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_iacm),
+            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_elem)
+        )
+
+    def subtract(self,  data_location: str, molid: int):
+        def s(shell, key, partial_charge, repo):
+            repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
+            if len(repo[shell][key]) == 0:
+                del repo[shell][key]
+            if len(repo[shell]) == 0:
+                del repo[shell]
+
+        self.__iterate(data_location, molid,
+            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_iacm),
+            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
+
     def __read_graphs(self, molids: List[int], data_location: str, ext: str, data_type: IOType) -> List[Tuple[int, nx.Graph]]:
         graphs = []
         with MultiProcessor(ReadWorker, (data_location, ext, data_type)) as mp:
@@ -144,50 +188,6 @@ class Repository:
                 for shell in range(1, self.__max_shell + 1):
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
-
-    @staticmethod
-    def read(self, location: str = REPO_LOCATION):
-        repo = Repository()
-        with ZipFile(location, mode='r') as zf:
-            repo.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
-            repo.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
-            repo.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
-            repo.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
-            repo.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
-        return repo
-
-    def add(self, data_location: str, molid: int):
-        def a(shell, key, partial_charge, repo):
-            if not shell in repo:
-                repo[shell] = dict()
-            if not key in repo[shell]:
-                repo[shell][key] = []
-            bisect.insort_left(repo[shell][key], partial_charge)
-
-        self.__iterate(data_location, molid,
-            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_iacm),
-            lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_elem)
-        )
-
-    def subtract(self,  data_location: str, molid: int):
-        def s(shell, key, partial_charge, repo):
-            repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
-            if len(repo[shell][key]) == 0:
-                del repo[shell][key]
-            if len(repo[shell]) == 0:
-                del repo[shell]
-
-        self.__iterate(data_location, molid,
-            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_iacm),
-            lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
-
-    def write(self, out: str):
-        with ZipFile(out, mode='w') as zf:
-            zf.writestr('meta', msgpack.packb((self.__min_shell, self.__max_shell)))
-            zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
-            zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
-            zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
-            zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
 
 
 class ReadWorker:

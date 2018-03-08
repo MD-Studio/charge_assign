@@ -1,7 +1,6 @@
 import hashlib
 import os
 import subprocess
-from io import BytesIO
 from itertools import groupby
 from typing import Any, Dict, Tuple
 
@@ -18,9 +17,9 @@ class Nauty:
         if not os.path.isfile(executable) or not os.access(executable, os.X_OK):
             raise ValueError('Could not find dreadnaut executable at: "%s". Did you install nauty (http://users.cecs.'
                              'anu.edu.au/~bdm/nauty/)?' % executable)
-        self.__exe = executable
+        self.exe = executable
         self.__process = subprocess.Popen(
-            [self.__exe],
+            [self.exe],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -54,7 +53,7 @@ class Nauty:
 
         if self.__process.poll():
             self.__process = subprocess.Popen(
-                [self.__exe],
+                [self.exe],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -72,7 +71,7 @@ class Nauty:
         return self.__nauty_output(out.strip().decode(), graph, idx, color_key, core)
 
     def __nauty_input(self, graph: nx.Graph, color_key:str) -> Tuple[str, Dict[int, Any]]:
-        idx = {v:i for i,v in enumerate(graph.nodes())}
+        idx = {v:i for i,v in enumerate(sorted(graph.nodes()))}
         input_str = ' n={num_atoms} g {edges}. f=[{node_partition}] cxb"END\n"->>\n'.format(
             num_atoms=graph.number_of_nodes(),
             edges=self.__nauty_edges(graph, idx),
@@ -82,7 +81,7 @@ class Nauty:
         return input_str, idx
 
     def __nauty_edges(self, graph: nx.Graph, idx: Dict[int, Any]) -> str:
-        bonds = sorted(map(lambda e: sorted((idx[e[0]], idx[e[1]])), graph.edges()))
+        bonds = sorted(map(lambda e: sorted((idx[e[0]], idx[e[1]])), sorted(graph.edges())))
 
         return ';'.join(map(lambda bond: '{0}:{1}'.format(bond[0], bond[1]), bonds))
 

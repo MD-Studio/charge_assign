@@ -13,6 +13,7 @@ from typing import Any
 
 import networkx as nx
 
+from charge.bond_type import BondType
 from charge.settings import IACM_MAP, IACM_ELEMENTS
 
 
@@ -40,16 +41,6 @@ class IOType(Enum):
             return ext[self]
         except KeyError:
             raise ValueError('Unsupported file type: {}'.format(self.name))
-
-
-class BondType(Enum):
-    """Supported chemical bond types."""
-
-    SINGLE = 'SINGLE'
-    DOUBLE = 'DOUBLE'
-    TRIPLE = 'TRIPLE'
-    AROMATIC = 'AROMATIC'
-    UNKNOWN = 'UNKNOWN'
 
 
 def __lgf_to_nx(obj: str) -> nx.Graph:

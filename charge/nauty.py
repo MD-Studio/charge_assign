@@ -81,7 +81,8 @@ class Nauty:
     def __nauty_node_partition(self, graph: nx.Graph, idx: Dict[int, Any], color_key:str) -> str:
         colors = sorted(set(data[color_key] for _, data in graph.nodes(data=True)))
         return '|'.join(
-            ','.join(str(idx[v]) for v, data in graph.nodes(data=True) if data[color_key] == color) for color in colors)
+                ','.join(map(str, sorted(idx[v] for v, data in graph.nodes(data=True) if data[color_key] == color)))
+            for color in colors)
 
     def __nauty_output(self, nautstr: str, graph: nx.Graph, idx: Dict[int, Any], color_key:str, core:Any) -> str:
         nodes = {v: k for k, v in idx.items()}

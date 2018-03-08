@@ -39,8 +39,7 @@ class Repository:
                  min_shell: int=1,
                  max_shell: int=7) -> None:
 
-        self.__nauty = nauty or Nauty()
-        self.__nauty_exe = self.__nauty.exe
+        self.__nauty = Nauty()
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 

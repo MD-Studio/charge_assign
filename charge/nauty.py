@@ -1,7 +1,6 @@
 import hashlib
 import os
 import subprocess
-from itertools import groupby
 from typing import Any, Dict, Tuple
 
 import msgpack
@@ -65,7 +64,7 @@ class Nauty:
         return self.__nauty_output(out.strip().decode(), graph, idx, color_key, core)
 
     def __nauty_input(self, graph: nx.Graph, color_key:str) -> Tuple[str, Dict[int, Any]]:
-        idx = {v:i for i,v in enumerate(sorted(graph.nodes()))}
+        idx = {v: i for i, v in enumerate(graph.nodes())}
         input_str = ' n={num_atoms} g {edges}. f=[{node_partition}] cxb"END\n"->>\n'.format(
             num_atoms=graph.number_of_nodes(),
             edges=self.__nauty_edges(graph, idx),
@@ -75,20 +74,14 @@ class Nauty:
         return input_str, idx
 
     def __nauty_edges(self, graph: nx.Graph, idx: Dict[int, Any]) -> str:
-        bonds = sorted(map(lambda e: sorted((idx[e[0]], idx[e[1]])), sorted(graph.edges())))
+        bonds = sorted(map(lambda e: sorted((idx[e[0]], idx[e[1]])), graph.edges()))
 
         return ';'.join(map(lambda bond: '{0}:{1}'.format(bond[0], bond[1]), bonds))
 
     def __nauty_node_partition(self, graph: nx.Graph, idx: Dict[int, Any], color_key:str) -> str:
-        def to_nx_node(v):
-            if not color_key in v[1]:
-                raise ValueError('Missing attribute: %s' % color_key)
-            return (idx[v[0]], v[1][color_key])
-
-        atoms = sorted(map(to_nx_node, graph.nodes(data=True)))
-
-        return '|'.join(map(lambda group: ','.join(map(lambda atom: str(atom[0]), group[1])),
-                            groupby(atoms, key=lambda atom: atom[1])))
+        colors = sorted(set(data[color_key] for _, data in graph.nodes(data=True)))
+        return '|'.join(
+            ','.join(str(idx[v]) for v, data in graph.nodes(data=True) if data[color_key] == color) for color in colors)
 
     def __nauty_output(self, nautstr: str, graph: nx.Graph, idx: Dict[int, Any], color_key:str, core:Any) -> str:
         nodes = {v: k for k, v in idx.items()}

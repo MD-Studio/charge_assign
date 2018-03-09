@@ -1,4 +1,5 @@
 import networkx as nx
+from pathlib import Path
 import pytest
 
 from charge.bond_type import BondType
@@ -188,3 +189,11 @@ def ref_graph_shifted(ref_graph_attributes, ref_graph_nodes_shifted, ref_graph_e
     graph.add_nodes_from(ref_graph_nodes_shifted)
     graph.add_edges_from(ref_graph_edges_shifted)
     return graph
+
+
+# Fixtures for testing repository building.
+
+@pytest.fixture
+def lgf_data_dir():
+    this_file = Path(__file__)
+    return this_file.parent / 'sample_lgf'

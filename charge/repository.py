@@ -45,6 +45,8 @@ class Repository:
 
         self.charges_iacm = defaultdict(lambda: defaultdict(list))
         self.charges_elem = defaultdict(lambda: defaultdict(list))
+        self.__iso_iacm = defaultdict(list)
+        self.__iso_elem = defaultdict(list)
 
     @staticmethod
     def create_from(

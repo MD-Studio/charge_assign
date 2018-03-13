@@ -16,6 +16,8 @@ DEFAULT_TOTAL_CHARGE = 0
 DEFAULT_TOTAL_CHARGE_DIFF = 0.01
 MAX_BINS = 25
 
+ROUNDING_DIGITS = 3
+
 REPO_LOCATION='atb.zip'
 
 IACM_MAP = dict([('O', 'O'), ('OM', 'O'), ('OA', 'O'), ('OE', 'O'), ('OW', 'O'), ('OMet', 'O'), ('ODmso', 'O'),

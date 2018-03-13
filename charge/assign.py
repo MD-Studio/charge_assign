@@ -1,12 +1,10 @@
 
 import networkx as nx
-from pulp import PULP_CBC_CMD, GLPK_CMD, COIN_CMD, CPLEX_CMD, GUROBI_CMD
 
-from charge.bond_type import BondType
 from charge import util
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.settings import SOLVER_MAX_SECONDS
+from charge.settings import ROUNDING_DIGITS
 
 
 class AssignmentError(Warning):
@@ -19,10 +17,12 @@ class Charger:
         self._nauty = nauty or Nauty()
         self._repo = repository or Repository(nauty=self._nauty)
 
-    def _set_partial_charges(self, graph: nx.Graph, iacm_only: bool, shell: int, **kwargs) -> bool:
+    def _set_partial_charges(self, graph: nx.Graph, iacm_only: bool,
+                             shell: int, rounding_digits: int, **kwargs) -> bool:
         pass
 
-    def charge(self, graph: nx.Graph, iacmize:bool=False, iacm_only:bool=False, shell:int=None, **kwargs) -> bool:
+    def charge(self, graph: nx.Graph, iacmize:bool=False, iacm_only:bool=False,
+               shell:int=None, rounding_digits:int = ROUNDING_DIGITS, **kwargs) -> bool:
         if iacmize:
             graph = util.iacmize(graph)
         return self._set_partial_charges(graph, iacm_only=iacm_only or iacmize,

@@ -110,6 +110,7 @@ class Nauty:
         nauty_edges = list()
         for u, v in edges:
             nauty_edges.append((to_nauty_id[u], to_nauty_id[v]))
+        nauty_edges.sort()
         return nauty_edges
 
     def __make_partition(

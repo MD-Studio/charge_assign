@@ -136,8 +136,8 @@ class Nauty:
         partition = list()
         for color, node_and_colors in groupby(colored_nauty_nodes, key=by_color):
             colors.append(color)
-            nauty_ids = map(get_node, node_and_colors)
-            partition.append((color, list(nauty_ids)))
+            nauty_ids = sorted(map(get_node, node_and_colors))
+            partition.append((color, nauty_ids))
 
         return colors, partition
 

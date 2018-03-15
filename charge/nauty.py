@@ -46,7 +46,7 @@ class Nauty:
         if shell > 0:
             fragment = graph.subgraph(bfs_nodes(graph, atom, max_depth=shell))
         else:
-            fragment = graph.subgraph(atom)
+            fragment = graph.subgraph([atom])
 
         result = self.canonize(fragment, color_key=color_key, core=atom)
         return result
@@ -56,7 +56,7 @@ class Nauty:
         for node, color_str in graph.nodes(data=color_key):
             node_colors.append((node == core, color_str))
 
-        input_str, colors = self.__make_nauty_input(graph, node_colors)
+        input_str = self.__make_nauty_input(graph, node_colors)
 
         if self.__process.poll():
             self.__process = subprocess.Popen(
@@ -77,19 +77,19 @@ class Nauty:
 
         output_str = out.strip().decode()
         canonical_nodes, adjacency_list = self.__parse_nauty_output(output_str, node_colors)
-        key = self.__make_hash(canonical_nodes, adjacency_list, colors)
+        key = self.__make_hash(canonical_nodes, adjacency_list)
         return key
 
     def __make_nauty_input(
             self,
             graph: nx.Graph,
             node_colors: List[Color]
-            ) -> Tuple[str, List[Color]]:
+            ) -> str:
 
         to_nauty_id = { v: i for i, v in enumerate(graph.nodes()) }
 
         nauty_edges = self.__make_nauty_edges(graph.edges(), to_nauty_id)
-        colors, partition = self.__make_partition(list(graph.nodes()), node_colors, to_nauty_id)
+        partition = self.__make_partition(list(graph.nodes()), node_colors, to_nauty_id)
 
         edges_str = self.__format_edges(nauty_edges)
         partition_str = self.__format_partition(partition)
@@ -99,7 +99,7 @@ class Nauty:
                 edges=edges_str,
                 partition=partition_str)
 
-        return input_str, colors
+        return input_str
 
     def __make_nauty_edges(
             self,
@@ -116,9 +116,9 @@ class Nauty:
     def __make_partition(
             self,
             nodes: List[Any],
-            node_colors: List[Tuple[bool, str]],
+            node_colors: List[Color],
             to_nauty_id: Dict[Any, int]
-            ) -> Tuple[List[Color], Any]:
+            ) -> List[Tuple[Color, List[int]]]:
 
         def by_color(node_and_color: Tuple[int, Color]) -> Color:
             return node_and_color[1]
@@ -132,14 +132,12 @@ class Nauty:
 
         colored_nauty_nodes.sort(key=by_color)
 
-        colors = list()
         partition = list()
         for color, node_and_colors in groupby(colored_nauty_nodes, key=by_color):
-            colors.append(color)
             nauty_ids = sorted(map(get_node, node_and_colors))
             partition.append((color, nauty_ids))
 
-        return colors, partition
+        return partition
 
     def __format_edges(self, nauty_edges: NautyEdges) -> str:
         nauty_edge_strings = list()
@@ -162,8 +160,8 @@ class Nauty:
             node_colors: List[Color]
             ) -> Tuple[List[int], NautyEdges]:
 
-        def get_color(nauty_id_str: str) -> Color:
-            return node_colors[int(nauty_id_str)]
+        def get_color(nauty_id_str: int) -> Color:
+            return node_colors[nauty_id_str]
 
         data = nauty_output.split('seconds')[-1].strip()
         lines = data.split('\n')
@@ -171,11 +169,12 @@ class Nauty:
         canonical_nodes_str = ''
         i = 0
         while ':' not in lines[i]:
-            canonical_nodes_str += lines[i][0:-1]
+            canonical_nodes_str += lines[i]
             i += 1
 
         canonical_nodes_strs = canonical_nodes_str.split()
-        canonical_nodes = list(map(get_color, canonical_nodes_strs))
+        canonical_nodes_ids = list(map(int, canonical_nodes_strs))
+        canonical_node_colors = list(map(get_color, canonical_nodes_ids))
 
         adjacency_list_lines = lines[i:-1]
         adjacency_list = list()
@@ -183,21 +182,25 @@ class Nauty:
             parts = line.split(':')
             node_id = int(parts[0])
             neighbors_str = parts[1][0:-1].strip()
-            neighbors_strs = neighbors_str.split(' ')
-            neighbors = list(map(int, neighbors_strs))
-            adjacency_list.append((node_id, neighbors))
+            if neighbors_str != '':
+                neighbors_strs = neighbors_str.split(' ')
+                neighbors_ids = list(map(int, neighbors_strs))
+            else:
+                neighbors_ids = list()
+
+            for neighbor_id in neighbors_ids:
+                adjacency_list.append((node_id, neighbor_id))
 
         adjacency_list.sort()
 
-        return canonical_nodes, adjacency_list
+        return canonical_node_colors, adjacency_list
 
     def __make_hash(
             self,
-            canonical_nodes: List[int],
-            adjacency_list: List[Tuple[int, List[int]]],
-            colors: List[Color]
+            canonical_nodes: List[Color],
+            adjacency_list: List[Tuple[int, int]]
             ) -> str:
 
-        canonical_signature = [canonical_nodes, adjacency_list, colors]
+        canonical_signature = [canonical_nodes, adjacency_list]
         canonical_bytes = msgpack.packb(canonical_signature)
         return hashlib.md5(canonical_bytes).hexdigest()

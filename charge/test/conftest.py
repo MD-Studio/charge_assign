@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from charge.bond_type import BondType
+from charge.nauty import Nauty
 
 # Fixtures for testing loading and saving to and from various
 # formats.
@@ -192,6 +193,38 @@ def ref_graph_shifted(ref_graph_attributes, ref_graph_nodes_shifted, ref_graph_e
 
 
 # Fixtures for testing repository building.
+
+@pytest.fixture
+def nauty():
+    nauty = Nauty()
+    yield nauty
+    nauty.__del__()
+
+
+@pytest.fixture
+def ref_graph2_nodes():
+    return [(5, {'atom_type': 'HC', 'label': 'H1', 'charge_group': 0}),
+            (4, {'atom_type': 'HC', 'label': 'H2', 'charge_group': 0}),
+            (2, {'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
+            (3, {'atom_type': 'HC', 'label': 'H3', 'charge_group': 0}),
+            (1, {'atom_type': 'HC', 'label': 'H4', 'charge_group': 0})]
+
+
+@pytest.fixture
+def ref_graph2_edges():
+    return [(5, 2, {'bond_type': BondType.UNKNOWN}),
+            (2, 3, {'bond_type': BondType.UNKNOWN}),
+            (2, 4, {'bond_type': BondType.UNKNOWN}),
+            (2, 1, {'bond_type': BondType.UNKNOWN})]
+
+
+@pytest.fixture
+def ref_graph2(ref_graph_attributes, ref_graph2_nodes, ref_graph2_edges):
+    graph = nx.Graph(**ref_graph_attributes)
+    graph.add_nodes_from(ref_graph2_nodes)
+    graph.add_edges_from(ref_graph2_edges)
+    return graph
+
 
 @pytest.fixture
 def lgf_data_dir():

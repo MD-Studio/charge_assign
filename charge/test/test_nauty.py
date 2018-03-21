@@ -66,3 +66,9 @@ def test_make_nauty_input(nauty, ref_graph):
     assert 'g 0:1;0:2;0:3;0:4' in nauty_input
     assert 'f=[0,1|2,3,4]' in nauty_input
     assert 'cxb' in nauty_input
+
+def test_make_nauty_edges(nauty, ref_graph):
+    to_nauty_id = { 1: 3, 2: 2, 3: 4, 4: 1, 5: 5 }
+    nauty_edges = nauty._Nauty__make_nauty_edges(
+            ref_graph.edges(), to_nauty_id)
+    assert nauty_edges == [(3, 1), (3, 2), (3, 4), (3, 5)]

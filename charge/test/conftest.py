@@ -230,3 +230,24 @@ def ref_graph2(ref_graph_attributes, ref_graph2_nodes, ref_graph2_edges):
 def lgf_data_dir():
     this_file = Path(__file__)
     return this_file.parent / 'sample_lgf'
+
+
+@pytest.fixture
+def ref_graph_nauty_output():
+    return (
+            '[fixing partition]\n'
+            '(3 4)\n'
+            'level 3:  4 orbits; 3 fixed; index 2\n'
+            '(2 3)\n'
+            'level 2:  3 orbits; 2 fixed; index 3\n'
+            '(1 2)\n'
+            'level 1:  2 orbits; 1 fixed; index 4\n'
+            '2 orbits; grpsize=24; 3 gens; 10 nodes; maxlev=4\n'
+            'canupdates=1; cpu time = 0.00 seconds\n'
+            '1 2 3 4 0\n'
+            '0 :  4;\n'
+            '1 :  4;\n'
+            '2 :  4;\n'
+            '3 :  4;\n'
+            '4 :  0 1 2 3;\n'
+            'END')

@@ -111,3 +111,18 @@ def test_format_edges(nauty):
             (int(edge_from), int(edge_to))
             for edge_from, edge_to in edge_str_tuples]
     assert set(in_edges) == set(edge_tuples)
+
+def test_parse_nauty_output(nauty, ref_graph_nauty_output):
+    node_colors = [
+            (False, 'HC0'), (False, 'HC1'), (False, 'HC2'), (False, 'HC3'),
+            (True, 'C4')]
+
+    canonical_nodes, edges = nauty._Nauty__parse_nauty_output(
+            ref_graph_nauty_output, node_colors)
+
+    assert canonical_nodes == [
+            (False, 'HC1'), (False, 'HC2'), (False, 'HC3'), (True, 'C4'),
+            (False, 'HC0')]
+    assert edges == [
+            (0, 4), (1, 4), (2, 4), (3, 4),
+            (4, 0), (4, 1), (4, 2), (4, 3)]

@@ -127,3 +127,16 @@ def test_parse_nauty_output(nauty, ref_graph_nauty_output):
     assert edges == [
             (0, 4), (1, 4), (2, 4), (3, 4),
             (4, 0), (4, 1), (4, 2), (4, 3)]
+
+def test_make_hash(nauty):
+    canonical_nodes = [
+            (False, 'HC1'), (False, 'HC2'), (False, 'HC3'), (True, 'C4'),
+            (False, 'HC0')]
+    adjacency_list = [
+            (0, 4), (1, 4), (2, 4), (3, 4),
+            (4, 0), (4, 1), (4, 2), (4, 3)]
+
+    result = nauty._Nauty__make_hash(
+            canonical_nodes,
+            adjacency_list)
+    assert result == 'e8db1181da33d48b8c8c43fa2869f91b'

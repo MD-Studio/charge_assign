@@ -25,8 +25,9 @@ def test_canonize_neighborhood_graph_1(nauty, ref_graph):
 def test_canonize_neighborhood_graph_2(nauty, ref_graph):
     key = nauty.canonize_neighborhood(ref_graph, 1, 1)
     ref_key = nauty._Nauty__make_hash(
-            [(False, 'C'), (False, 'HC'), (False, 'HC'), (False, 'HC'), (True, 'HC')],
-            [(0, 1), (0, 2), (0, 3), (0, 4), (1, 0), (1, 2), (1, 3), (1, 4)])
+            [(False, 'HC'), (False, 'HC'), (False, 'HC'), (False, 'HC'), (True, 'C')],
+            [(0, 4), (1, 4), (2, 4), (3, 4), (4, 0), (4, 1), (4, 2), (4, 3)])
+    assert key == ref_key
 
 def test_canonize_neighborhood_same_graph(nauty, ref_graph, ref_graph2):
     """Tests different representations of the same graph."""

@@ -72,3 +72,27 @@ def test_make_nauty_edges(nauty, ref_graph):
     nauty_edges = nauty._Nauty__make_nauty_edges(
             ref_graph.edges(), to_nauty_id)
     assert nauty_edges == [(3, 1), (3, 2), (3, 4), (3, 5)]
+
+def test_make_partition(nauty, ref_graph):
+    node_colors = [data['atom_type'] for node, data in ref_graph.nodes(data=True)]
+    to_nauty_id = { 1: 3, 2: 2, 3: 4, 4: 1, 5: 5 }
+    partition = nauty._Nauty__make_partition(
+            list(ref_graph.nodes()),
+            node_colors,
+            to_nauty_id)
+
+    # check that partition is sorted by color
+    colors = [color for color, nodes in partition]
+    assert sorted(colors) == colors
+
+    # check that the nodes really have those colors
+    for i, color in enumerate(node_colors):
+        nodes_with_this_color = [
+                to_nauty_id[node]
+                for node, data in ref_graph.nodes(data=True)
+                if data['atom_type'] == color]
+        cur_node_set = [
+                pnodes
+                for pcolor, pnodes in partition
+                if pcolor == color]
+        assert sorted(nodes_with_this_color) == sorted(cur_node_set[0])

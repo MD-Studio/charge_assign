@@ -96,3 +96,18 @@ def test_make_partition(nauty, ref_graph):
                 for pcolor, pnodes in partition
                 if pcolor == color]
         assert sorted(nodes_with_this_color) == sorted(cur_node_set[0])
+
+def test_format_edges(nauty):
+    in_edges = [(1, 2), (3, 2), (4, 2), (5, 2), (5, 6), (6, 7)]
+    nauty_edges = nauty._Nauty__format_edges(in_edges)
+
+    edge_tuple_strings = nauty_edges.split(';')
+    assert len(edge_tuple_strings) == 6
+
+    edge_str_tuples = [
+            tuple(edge_tuple_string.split(':'))
+            for edge_tuple_string in edge_tuple_strings]
+    edge_tuples = [
+            (int(edge_from), int(edge_to))
+            for edge_from, edge_to in edge_str_tuples]
+    assert set(in_edges) == set(edge_tuples)

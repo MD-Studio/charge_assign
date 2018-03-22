@@ -16,7 +16,12 @@ NautyEdges = List[Tuple[int, int]]
 
 
 class Nauty:
+    """Manages a dreadnaut process and communicates with it.
 
+    Args:
+        executable: The path to the dreadnaut executable. If not \
+                specified, search the path for one.
+    """
     def __init__(self, executable: str=NAUTY_EXC) -> None:
         if not os.path.isfile(executable) or not os.access(executable, os.X_OK):
             raise ValueError('Could not find dreadnaut executable at: "%s". Did you install nauty (http://users.cecs.'
@@ -43,6 +48,29 @@ class Nauty:
             pass
 
     def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int, color_key='atom_type') -> str:
+        """Calculate a canonical key for a neighborhood of an atom.
+
+        Given a molecule graph and an atom in that molecule, this \
+        function finds the neighborhood of the given atom of the given \
+        depth, and returns a string that uniquely identifies that \
+        neighborhood.
+
+        A neighborhood comprises the given atom, any atoms at most \
+        shell covalent bonds away from it, and any covalent bonds \
+        between those atoms.
+
+        Neighborhoods that consist of atoms with the same colors, \
+        connected in the same way, will return the same key.
+
+        Args:
+            graph: A molecule's atomic graph.
+            atom: A node in graph, the core of the neighborhood.
+            shell: Shell size to use when creating the neighborhood.
+            color_key: Attribute key to use to determine atom color.
+
+        Returns:
+            A string unique to the neighborhood.
+        """
         if shell > 0:
             fragment = graph.subgraph(bfs_nodes(graph, atom, max_depth=shell))
         else:
@@ -52,6 +80,27 @@ class Nauty:
         return result
 
     def canonize(self, graph: nx.Graph, color_key='atom_type', core: Any=None) -> str:
+        """Calculate a canonical key for a molecular graph.
+
+        Two graphs that consist of atoms with the same colors, \
+        connected in the same way, will return the same key.
+
+        If a core is given, it must have the same color in both graphs \
+        for them to return an identical key, and the same relative \
+        position. Note that the same graph may yield the same key for \
+        different atoms, if they are indistinguishable. For example, a \
+        methane molecule will give the same key regardless of which of \
+        its hydrogen atoms is designated as the core, but will give a \
+        different key if the carbon atom is selected in one graph.
+
+        Args:
+            graph: An atomic (sub)graph.
+            color_key: Attribute key to use to determine atom color.
+            core: A node in graph that is the core of the graph.
+
+        Returns:
+            A string unique to the graph.
+        """
         node_colors = list()
         for node, color_str in graph.nodes(data=color_key):
             node_colors.append((node == core, color_str))
@@ -85,7 +134,20 @@ class Nauty:
             graph: nx.Graph,
             node_colors: List[Color]
             ) -> str:
+        """Creates a dreadnaut input description of a graph.
 
+        This function creates a string which, when fed to dreadnaut, \
+        will cause it to calculate a canonical description of the \
+        given graph.
+
+        Args:
+            graph: A molecular graph.
+            node_colors: The colors of the nodes, in the same order \
+                    as the nodes are returned by graph.nodes().
+
+        Returns:
+            A string to pass to dreadnaut.
+        """
         to_nauty_id = { v: i for i, v in enumerate(graph.nodes()) }
 
         nauty_edges = self.__make_nauty_edges(graph.edges(), to_nauty_id)
@@ -106,7 +168,15 @@ class Nauty:
             edges: List[Tuple[Any, Any]],
             to_nauty_id: Dict[Any, int]
             ) -> NautyEdges:
+        """Convert a set of edges to nauty ids.
 
+        Args:
+            edges: A list of pairs of graph nodes.
+            to_nauty_id: A map of nodes to ints (nauty ids).
+
+        Returns:
+            The same pairs, but expressed using nauty ids.
+        """
         nauty_edges = list()
         for u, v in edges:
             nauty_edges.append((to_nauty_id[u], to_nauty_id[v]))
@@ -119,7 +189,16 @@ class Nauty:
             node_colors: List[Color],
             to_nauty_id: Dict[Any, int]
             ) -> List[Tuple[Color, List[int]]]:
+        """Organises atoms by color, for passing to dreadnaut.
 
+        Args:
+            nodes: A list of graph nodes.
+            node_colors: A list of corresponding node colors.
+            to_nauty_id: A map from graph nodes to nauty ids.
+
+        Returns:
+            A list of nauty node id groups, grouped by color.
+        """
         def by_color(node_and_color: Tuple[int, Color]) -> Color:
             return node_and_color[1]
 
@@ -140,13 +219,32 @@ class Nauty:
         return partition
 
     def __format_edges(self, nauty_edges: NautyEdges) -> str:
+        """Create a dreadnaut representation of the given edges.
+
+        Args:
+            nauty_edges: A list of pairs of nauty node ids.
+
+        Returns:
+            A string describing the edges in dreadnaut format.
+        """
         nauty_edge_strings = list()
         for u, v in nauty_edges:
             nauty_edge_strings.append('{}:{}'.format(u, v))
 
         return ';'.join(nauty_edge_strings)
 
-    def __format_partition(self, partition: Any) -> str:
+    def __format_partition(
+            self,
+            partition: List[Tuple[Color, List[int]]]
+            ) -> str:
+        """Create a dreadnaut representation of an atom partition.
+
+        Args:
+            partition: A list of lists of nauty node ids, grouped by color.
+
+        Returns:
+            A string describing the partition in dreadnaut format.
+        """
         nauty_cell_strings = list()
         for _, nauty_ids in partition:
             nauty_id_strs = map(str, nauty_ids)
@@ -159,7 +257,19 @@ class Nauty:
             nauty_output: str,
             node_colors: List[Color]
             ) -> Tuple[List[int], NautyEdges]:
+        """Parses textual nauty output.
 
+        This function reads the dreadnaut output and extracts the \
+        canonically ordered node list, and the list of edges.
+
+        Args:
+            nauty_output: The output produced by dreadnaut.
+            node_colors: A list of node colors, indexed by nauty id.
+
+        Returns:
+            A list of node colors, in canonical order, and a list of \
+                    node pairs representing edges, using nauty ids.
+        """
         def get_color(nauty_id_str: int) -> Color:
             return node_colors[nauty_id_str]
 
@@ -200,7 +310,21 @@ class Nauty:
             canonical_nodes: List[Color],
             adjacency_list: List[Tuple[int, int]]
             ) -> str:
+        """Creates a unique string from dreadnaut output.
 
+        This function creates a fixed-size string from the given \
+        arguments. It does not canonicalize anything itself, to get \
+        it to produce an identical string, you have to give it \
+        identical arguments.
+
+        The one exception to this is a hash collision, but the \
+        probability of that is less than 1 in 10^30 or so, so not even \
+        the birthday paradox is enough to make that happen in practice.
+
+        Args:
+            canonical_nodes: A list of node colors in canonical order.
+            adjacency_list: A list of edges, using nauty ids.
+        """
         canonical_signature = [canonical_nodes, adjacency_list]
         canonical_bytes = msgpack.packb(canonical_signature)
         return hashlib.md5(canonical_bytes).hexdigest()

@@ -351,7 +351,7 @@ class Nauty:
     def __make_hash(
             self,
             canonical_nodes: List[Color],
-            adjacency_list: List[Tuple[int, int]]
+            edges: List[Tuple[int, int]]
             ) -> str:
         """Creates a unique string from dreadnaut output.
 
@@ -368,6 +368,6 @@ class Nauty:
             canonical_nodes: A list of node colors in canonical order.
             adjacency_list: A list of edges, using nauty ids.
         """
-        canonical_signature = [canonical_nodes, adjacency_list]
+        canonical_signature = [canonical_nodes, edges]
         canonical_bytes = msgpack.packb(canonical_signature)
         return hashlib.md5(canonical_bytes).hexdigest()

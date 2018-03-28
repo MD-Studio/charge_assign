@@ -108,19 +108,12 @@ class Nauty:
         for node, color_str in graph.nodes(data=color_key):
             node_colors.append((node == core, color_str))
 
-        input_str = self.__make_nauty_input(graph, node_colors)
+        nauty_input = self.__make_nauty_input(graph, node_colors)
 
         self.__ensure_dreadnaut_running()
+        nauty_output = self.__communicate(nauty_input)
 
-        self.__process.stdin.write(input_str.encode())
-        self.__process.stdin.flush()
-
-        out = self.__process.stdout.read(1000)
-        while not b'END' in out:
-            out += self.__process.stdout.read(1000)
-
-        output_str = out.strip().decode()
-        canonical_node_ids, adjacency_lists = self.__parse_nauty_output(output_str)
+        canonical_node_ids, adjacency_lists = self.__parse_nauty_output(nauty_output)
         canonical_node_colors = self.__canonical_node_colors(canonical_node_ids, node_colors)
         canonical_edges = self.__canonical_edges(adjacency_lists)
         key = self.__make_hash(canonical_node_colors, canonical_edges)
@@ -137,6 +130,25 @@ class Nauty:
                 bufsize=0,
                 close_fds=True
             )
+
+    def __communicate(self, input_str: str) -> str:
+        """Sends input to a running dreadnaut, and returns output.
+
+        Args:
+            input_str: The input to send to the dreadnaut process.
+
+        Returns:
+            The corresponding output produced by dreadnaut.
+        """
+        self.__process.stdin.write(input_str.encode())
+        self.__process.stdin.flush()
+
+        out = self.__process.stdout.read(1000)
+        while not b'END' in out:
+            out += self.__process.stdout.read(1000)
+
+        return out.strip().decode()
+
 
     def __make_nauty_input(
             self,

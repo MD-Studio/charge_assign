@@ -114,19 +114,44 @@ def test_format_edges(nauty):
     assert set(in_edges) == set(edge_tuples)
 
 def test_parse_nauty_output(nauty, ref_graph_nauty_output):
+    canonical_nodes, adjacency_lists = nauty._Nauty__parse_nauty_output(
+            ref_graph_nauty_output)
+
+    assert canonical_nodes == [1, 2, 3, 4, 0]
+    assert adjacency_lists == [
+            (0, [4]),
+            (1, [4]),
+            (2, [4]),
+            (3, [4]),
+            (4, [0, 1, 2, 3])]
+
+
+def test_canonical_node_colors(nauty):
     node_colors = [
             (False, 'HC0'), (False, 'HC1'), (False, 'HC2'), (False, 'HC3'),
             (True, 'C4')]
 
-    canonical_nodes, edges = nauty._Nauty__parse_nauty_output(
-            ref_graph_nauty_output, node_colors)
+    node_ids = [2, 4, 3, 0, 1]
 
-    assert canonical_nodes == [
-            (False, 'HC1'), (False, 'HC2'), (False, 'HC3'), (True, 'C4'),
-            (False, 'HC0')]
-    assert edges == [
-            (0, 4), (1, 4), (2, 4), (3, 4),
-            (4, 0), (4, 1), (4, 2), (4, 3)]
+    colors = nauty._Nauty__canonical_node_colors(node_ids, node_colors)
+
+    assert colors == [
+            (False, 'HC2'),
+            (True, 'C4'),
+            (False, 'HC3'),
+            (False, 'HC0'),
+            (False, 'HC1')]
+
+
+def test_canonical_edges(nauty):
+    adjacency_lists = [
+            (0, [1, 2, 3]),
+            (2, [1, 4])]
+
+    edges = nauty._Nauty__canonical_edges(adjacency_lists)
+
+    assert edges == [(0, 1), (0, 2), (0, 3), (2, 1), (2, 4)]
+
 
 def test_make_hash(nauty):
     canonical_nodes = [

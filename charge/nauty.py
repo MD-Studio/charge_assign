@@ -111,8 +111,10 @@ class Nauty:
             out += self.__process.stdout.read(1000)
 
         output_str = out.strip().decode()
-        canonical_nodes, adjacency_list = self.__parse_nauty_output(output_str, node_colors)
-        key = self.__make_hash(canonical_nodes, adjacency_list)
+        canonical_node_ids, adjacency_lists = self.__parse_nauty_output(output_str)
+        canonical_node_colors = self.__canonical_node_colors(canonical_node_ids, node_colors)
+        canonical_edges = self.__canonical_edges(adjacency_lists)
+        key = self.__make_hash(canonical_node_colors, canonical_edges)
         return key
 
     def __ensure_dreadnaut_running(self):
@@ -252,8 +254,7 @@ class Nauty:
 
     def __parse_nauty_output(
             self,
-            nauty_output: str,
-            node_colors: List[Color]
+            nauty_output: str
             ) -> Tuple[List[int], NautyEdges]:
         """Parses textual nauty output.
 
@@ -262,46 +263,90 @@ class Nauty:
 
         Args:
             nauty_output: The output produced by dreadnaut.
-            node_colors: A list of node colors, indexed by nauty id.
 
         Returns:
             A list of node colors, in canonical order, and a list of \
                     node pairs representing edges, using nauty ids.
         """
-        def get_color(nauty_id_str: int) -> Color:
-            return node_colors[nauty_id_str]
+        def extract_data(nauty_output: str) -> List[str]:
+            """Skips header output and returns list of data lines."""
+            data = nauty_output.split('seconds')[-1].strip()
+            return data.split('\n')
 
-        data = nauty_output.split('seconds')[-1].strip()
-        lines = data.split('\n')
+        def extract_canonical_nodes_ids(
+                lines: List[str]
+                ) -> Tuple[List[int], List[str]]:
+            """Returns canonical nodes as nauty ids, and the remaining
+            lines.
+            """
+            canonical_nodes_ids = list()
+            i = 0
+            while ':' not in lines[i]:
+                canonical_ids = map(int, lines[i].split())
+                canonical_nodes_ids.extend(canonical_ids)
+                i += 1
+            return canonical_nodes_ids, lines[i:-1]
 
-        canonical_nodes_str = ''
-        i = 0
-        while ':' not in lines[i]:
-            canonical_nodes_str += lines[i]
-            i += 1
+        def extract_adjacency_lists(
+                lines: List[str]
+                ) -> Tuple[int, List[int]]:
+            """Extracts pairs of node id, neighbours list from nauty
+            output."""
+            adjacency_pairs = list()
+            for line in lines:
+                parts = line.split(':')
+                node_id = int(parts[0])
+                neighbors = parts[1][0:-1]
+                neighbors_ids = list(map(int, neighbors.split()))
+                adjacency_pairs.append((node_id, neighbors_ids))
+            return adjacency_pairs
 
-        canonical_nodes_strs = canonical_nodes_str.split()
-        canonical_nodes_ids = list(map(int, canonical_nodes_strs))
-        canonical_node_colors = list(map(get_color, canonical_nodes_ids))
 
-        adjacency_list_lines = lines[i:-1]
-        adjacency_list = list()
-        for line in adjacency_list_lines:
-            parts = line.split(':')
-            node_id = int(parts[0])
-            neighbors_str = parts[1][0:-1].strip()
-            if neighbors_str != '':
-                neighbors_strs = neighbors_str.split(' ')
-                neighbors_ids = list(map(int, neighbors_strs))
-            else:
-                neighbors_ids = list()
+        lines = extract_data(nauty_output)
+        canonical_nodes_ids, lines = extract_canonical_nodes_ids(lines)
+        adjacency_lists = extract_adjacency_lists(lines)
 
-            for neighbor_id in neighbors_ids:
-                adjacency_list.append((node_id, neighbor_id))
+        return canonical_nodes_ids, adjacency_lists
 
-        adjacency_list.sort()
+    def __canonical_node_colors(
+            self,
+            canonical_node_ids: List[int],
+            node_colors: List[Color]
+            ) -> List[Color]:
+        """Returns node colors in canonical order.
 
-        return canonical_node_colors, adjacency_list
+        Args:
+            canonical_node_ids: Nauty node ids, in canonical order.
+            node_colors: List of node colors indexed by nauty id.
+
+        Returns:
+            A list of node colors in canonical order.
+        """
+        def get_color(nauty_id: int) -> Color:
+            return node_colors[nauty_id]
+
+        return list(map(get_color, canonical_node_ids))
+
+
+    def __canonical_edges(
+            self,
+            adjacency_lists: List[Tuple[int, List[int]]]
+            ) -> NautyEdges:
+        """Returns a list of edges, as pairs of nauty ids.
+
+        Args:
+            adjacency_lists: The adjacency lists output by dreadnaut.
+
+        Returns:
+            The corresponding list of edges.
+        """
+        canonical_edges = list()
+        for node_id, neighbors in adjacency_lists:
+            for neighbor_id in neighbors:
+                canonical_edges.append((node_id, neighbor_id))
+        canonical_edges.sort()
+
+        return canonical_edges
 
     def __make_hash(
             self,

@@ -27,14 +27,8 @@ class Nauty:
             raise ValueError('Could not find dreadnaut executable at: "%s". Did you install nauty (http://users.cecs.'
                              'anu.edu.au/~bdm/nauty/)?' % executable)
         self.exe = executable
-        self.__process = subprocess.Popen(
-            [self.exe],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            bufsize=0,
-            close_fds=True
-        )
+        self.__process = None
+        self.__ensure_dreadnaut_running()
 
     def __del__(self):
         try:
@@ -107,15 +101,7 @@ class Nauty:
 
         input_str = self.__make_nauty_input(graph, node_colors)
 
-        if self.__process.poll():
-            self.__process = subprocess.Popen(
-                [self.exe],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=0,
-                close_fds=True
-            )
+        self.__ensure_dreadnaut_running()
 
         self.__process.stdin.write(input_str.encode())
         self.__process.stdin.flush()
@@ -128,6 +114,18 @@ class Nauty:
         canonical_nodes, adjacency_list = self.__parse_nauty_output(output_str, node_colors)
         key = self.__make_hash(canonical_nodes, adjacency_list)
         return key
+
+    def __ensure_dreadnaut_running(self):
+        """Starts dreadnaut if it isn't running."""
+        if not self.__process or self.__process.poll():
+            self.__process = subprocess.Popen(
+                [self.exe],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0,
+                close_fds=True
+            )
 
     def __make_nauty_input(
             self,

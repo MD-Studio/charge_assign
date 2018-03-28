@@ -12,8 +12,16 @@ from charge.util import bfs_nodes
 
 
 Color = Tuple[bool, str]
-NautyEdges = List[Tuple[int, int]]
+"""Nodes are colored by whether they are the core node, and then by atom type."""
 
+Partition = List[Tuple[Color, List[int]]]
+"""A Partition is a list of groups of node indexes, grouped and sorted by color."""
+
+Edges = List[Tuple[int, int]]
+"""Edges are pairs of node indexes."""
+
+AdjacencyLists = List[Tuple[int, List[int]]]
+"""Dreadnaut's way of describing a graph's topology, maps each node to its neighbors."""
 
 class Nauty:
     """Manages a dreadnaut process and communicates with it.
@@ -41,7 +49,7 @@ class Nauty:
         except ValueError:
             pass
 
-    def canonize_neighborhood(self, graph: nx.Graph, atom: Any, shell: int, color_key='atom_type') -> str:
+    def canonize_neighborhood(self, graph: nx.Graph, core: Any, shell: int, color_key='atom_type') -> str:
         """Calculate a canonical key for a neighborhood of an atom.
 
         Given a molecule graph and an atom in that molecule, this \
@@ -58,7 +66,7 @@ class Nauty:
 
         Args:
             graph: A molecule's atomic graph.
-            atom: A node in graph, the core of the neighborhood.
+            core: A node in graph, the core of the neighborhood.
             shell: Shell size to use when creating the neighborhood.
             color_key: Attribute key to use to determine atom color.
 
@@ -66,11 +74,11 @@ class Nauty:
             A string unique to the neighborhood.
         """
         if shell > 0:
-            fragment = graph.subgraph(bfs_nodes(graph, atom, max_depth=shell))
+            fragment = graph.subgraph(bfs_nodes(graph, core, max_depth=shell))
         else:
-            fragment = graph.subgraph([atom])
+            fragment = graph.subgraph([core])
 
-        result = self.canonize(fragment, color_key=color_key, core=atom)
+        result = self.canonize(fragment, color_key=color_key, core=core)
         return result
 
     def canonize(self, graph: nx.Graph, color_key='atom_type', core: Any=None) -> str:
@@ -82,10 +90,11 @@ class Nauty:
         If a core is given, it must have the same color in both graphs \
         for them to return an identical key, and the same relative \
         position. Note that the same graph may yield the same key for \
-        different atoms, if they are indistinguishable. For example, a \
-        methane molecule will give the same key regardless of which of \
-        its hydrogen atoms is designated as the core, but will give a \
-        different key if the carbon atom is selected in one graph.
+        different core atoms, if they are indistinguishable. For
+        example, a methane molecule will give the same key regardless \
+        of which of its hydrogen atoms is designated as the core, but \
+        will give a different key if the carbon atom is selected in \
+        one graph and a hydrogen in the other.
 
         Args:
             graph: An atomic (sub)graph.
@@ -148,10 +157,10 @@ class Nauty:
         Returns:
             A string to pass to dreadnaut.
         """
-        to_nauty_id = { v: i for i, v in enumerate(graph.nodes()) }
+        node_to_index = { v: i for i, v in enumerate(graph.nodes()) }
 
-        nauty_edges = self.__make_nauty_edges(graph.edges(), to_nauty_id)
-        partition = self.__make_partition(list(graph.nodes()), node_colors, to_nauty_id)
+        nauty_edges = self.__make_nauty_edges(graph.edges(), node_to_index)
+        partition = self.__make_partition(list(graph.nodes()), node_colors, node_to_index)
 
         edges_str = self.__format_edges(nauty_edges)
         partition_str = self.__format_partition(partition)
@@ -166,20 +175,20 @@ class Nauty:
     def __make_nauty_edges(
             self,
             edges: List[Tuple[Any, Any]],
-            to_nauty_id: Dict[Any, int]
-            ) -> NautyEdges:
-        """Convert a set of edges to nauty ids.
+            node_to_index: Dict[Any, int]
+            ) -> Edges:
+        """Convert a set of edges to use node indexes.
 
         Args:
             edges: A list of pairs of graph nodes.
-            to_nauty_id: A map of nodes to ints (nauty ids).
+            node_to_index: A map from nodes to their indexes.
 
         Returns:
-            The same pairs, but expressed using nauty ids.
+            The same pairs, but expressed using node indexes.
         """
         nauty_edges = list()
         for u, v in edges:
-            nauty_edges.append((to_nauty_id[u], to_nauty_id[v]))
+            nauty_edges.append((node_to_index[u], node_to_index[v]))
         nauty_edges.sort()
         return nauty_edges
 
@@ -187,17 +196,18 @@ class Nauty:
             self,
             nodes: List[Any],
             node_colors: List[Color],
-            to_nauty_id: Dict[Any, int]
-            ) -> List[Tuple[Color, List[int]]]:
+            node_to_index: Dict[Any, int]
+            ) -> Partition:
         """Organises atoms by color, for passing to dreadnaut.
 
         Args:
             nodes: A list of graph nodes.
             node_colors: A list of corresponding node colors.
-            to_nauty_id: A map from graph nodes to nauty ids.
+            node_to_index: A map from graph nodes to their indexes.
 
         Returns:
-            A list of nauty node id groups, grouped by color.
+            A list of groups of node indexes, grouped and sorted by \
+                    color.
         """
         def by_color(node_and_color: Tuple[int, Color]) -> Color:
             return node_and_color[1]
@@ -207,7 +217,7 @@ class Nauty:
 
         colored_nauty_nodes = list()
         for node_id, color in enumerate(node_colors):
-            colored_nauty_nodes.append((to_nauty_id[nodes[node_id]], color))
+            colored_nauty_nodes.append((node_to_index[nodes[node_id]], color))
 
         colored_nauty_nodes.sort(key=by_color)
 
@@ -218,29 +228,30 @@ class Nauty:
 
         return partition
 
-    def __format_edges(self, nauty_edges: NautyEdges) -> str:
+    def __format_edges(self, edges: Edges) -> str:
         """Create a dreadnaut representation of the given edges.
 
         Args:
-            nauty_edges: A list of pairs of nauty node ids.
+            edges: A list of pairs of node indexes.
 
         Returns:
             A string describing the edges in dreadnaut format.
         """
         nauty_edge_strings = list()
-        for u, v in nauty_edges:
+        for u, v in edges:
             nauty_edge_strings.append('{}:{}'.format(u, v))
 
         return ';'.join(nauty_edge_strings)
 
     def __format_partition(
             self,
-            partition: List[Tuple[Color, List[int]]]
+            partition: Partition
             ) -> str:
         """Create a dreadnaut representation of an atom partition.
 
         Args:
-            partition: A list of lists of nauty node ids, grouped by color.
+            partition: A list of groups of node indexes, grouped and \
+                    sorted by color.
 
         Returns:
             A string describing the partition in dreadnaut format.
@@ -255,18 +266,18 @@ class Nauty:
     def __parse_nauty_output(
             self,
             nauty_output: str
-            ) -> Tuple[List[int], List[Tuple[int, List[int]]]]:
+            ) -> Tuple[List[int], AdjacencyLists]:
         """Parses textual nauty output.
 
         This function reads the dreadnaut output and extracts the \
-        canonically ordered node list, and the list of edges.
+        canonically ordered node list, and the adjacency lists.
 
         Args:
             nauty_output: The output produced by dreadnaut.
 
         Returns:
-            A list of nauty ids, in canonical order, and a list of \
-                    adjacency lists per node, using nauty ids.
+            A list of node indexes, in canonical order, and a list of \
+                    adjacency lists per node, using node indexes.
         """
         def extract_data(nauty_output: str) -> List[str]:
             """Skips header output and returns list of data lines."""
@@ -276,8 +287,8 @@ class Nauty:
         def extract_canonical_nodes_ids(
                 lines: List[str]
                 ) -> Tuple[List[int], List[str]]:
-            """Returns canonical nodes as nauty ids, and the remaining
-            lines.
+            """Returns node indexes in canonical order, and the
+            remaining lines.
             """
             canonical_nodes_ids = list()
             i = 0
@@ -317,7 +328,7 @@ class Nauty:
 
         Args:
             canonical_node_ids: Nauty node ids, in canonical order.
-            node_colors: List of node colors indexed by nauty id.
+            node_colors: List of node colors, indexed by node index.
 
         Returns:
             A list of node colors in canonical order.
@@ -330,9 +341,9 @@ class Nauty:
 
     def __canonical_edges(
             self,
-            adjacency_lists: List[Tuple[int, List[int]]]
-            ) -> NautyEdges:
-        """Returns a list of edges, as pairs of nauty ids.
+            adjacency_lists: AdjacencyLists
+            ) -> Edges:
+        """Returns a list of edges, as pairs of node indexes.
 
         Args:
             adjacency_lists: The adjacency lists output by dreadnaut.
@@ -351,22 +362,23 @@ class Nauty:
     def __make_hash(
             self,
             canonical_nodes: List[Color],
-            edges: List[Tuple[int, int]]
+            edges: Edges
             ) -> str:
         """Creates a unique string from dreadnaut output.
 
         This function creates a fixed-size string from the given \
-        arguments. It does not canonicalize anything itself, to get \
+        arguments. It does not canonicalize anything itself; to get \
         it to produce an identical string, you have to give it \
         identical arguments.
 
         The one exception to this is a hash collision, but the \
         probability of that is less than 1 in 10^30 or so, so not even \
-        the birthday paradox is enough to make that happen in practice.
+        the birthday paradox on a sizeable database is enough to make \
+        that happen in practice.
 
         Args:
             canonical_nodes: A list of node colors in canonical order.
-            adjacency_list: A list of edges, using nauty ids.
+            edges: A list of edges, using node indexes.
         """
         canonical_signature = [canonical_nodes, edges]
         canonical_bytes = msgpack.packb(canonical_signature)

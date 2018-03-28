@@ -227,7 +227,8 @@ class Repository:
             ) -> Dict[int, List[int]]:
         """Find isomorphic molids and create map of them."""
         isomorphics = defaultdict(list)
-        for _, group in groupby(molids, key=lambda molid: canons[molid]):
+        molids_by_key = sorted(molids, key=lambda molid: canons[molid])
+        for _, group in groupby(molids_by_key, key=lambda molid: canons[molid]):
             isogroup = list(group)
             if len(isogroup) > 1:
                 for molid in isogroup:

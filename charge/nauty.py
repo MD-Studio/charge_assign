@@ -255,7 +255,7 @@ class Nauty:
     def __parse_nauty_output(
             self,
             nauty_output: str
-            ) -> Tuple[List[int], NautyEdges]:
+            ) -> Tuple[List[int], List[Tuple[int, List[int]]]:
         """Parses textual nauty output.
 
         This function reads the dreadnaut output and extracts the \
@@ -265,8 +265,8 @@ class Nauty:
             nauty_output: The output produced by dreadnaut.
 
         Returns:
-            A list of node colors, in canonical order, and a list of \
-                    node pairs representing edges, using nauty ids.
+            A list of nauty ids, in canonical order, and a list of \
+                    adjacency lists per node, using nauty ids.
         """
         def extract_data(nauty_output: str) -> List[str]:
             """Skips header output and returns list of data lines."""

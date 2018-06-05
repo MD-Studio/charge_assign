@@ -11,7 +11,12 @@ class ProcClass:
 class ProcClassInitTester:
     def __init__(self, arg1, arg2='3'):
         assert arg1 == 1
-        assert arg2 == '2'
+        assert arg2 == '3'
+
+
+class ProcClassInitZeroTester:
+    def __init__(self, arg1):
+        assert arg1 == 0
 
 
 class ProcClassAdder:
@@ -32,6 +37,11 @@ def test_create2():
     mp.shutdown()
 
 
+def test_create_initargs0():
+    mp = MultiProcessor(ProcClassInitZeroTester, 0, 1)
+    mp.shutdown()
+
+
 def test_create_initargs1():
     mp = MultiProcessor(ProcClassInitTester, (1,), 1)
     mp.shutdown()
@@ -43,8 +53,13 @@ def test_create_initargs2():
 
 
 def test_create_initargs3():
-    mp = MultiProcessor(ProcClassInitTester, (1, '2'), 1)
+    mp = MultiProcessor(ProcClassInitTester, (1, '3'), 1)
     mp.shutdown()
+
+
+def test_create_error_handling():
+    with pytest.raises(RuntimeError):
+        mp = MultiProcessor(ProcClassInitTester, (1, 2), 1)
 
 
 def test_scope_guard():

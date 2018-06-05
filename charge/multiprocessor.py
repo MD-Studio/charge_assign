@@ -1,11 +1,20 @@
 import multiprocessing as mp
 import os
 import sys
+import traceback
 from typing import Any, Generator, List, Tuple, Type
 
 from charge.util import print_progress
 
 class _Stop:
+    pass
+
+
+class _Error:
+    def __init__(self, message: str):
+        self.exception_message = message
+
+class _Ready:
     pass
 
 
@@ -47,7 +56,7 @@ class MultiProcessor:
             num_processes: Number of processes to use. Defaults to the \
                     number of CPUs in the machine.
         """
-        if not proc_init_arguments:
+        if proc_init_arguments is None:
             proc_init_arguments = ()
 
         if not isinstance(proc_init_arguments, tuple):
@@ -66,6 +75,10 @@ class MultiProcessor:
                     target=MultiProcessor.__runner,
                     args=(self.__in_queue, self.__out_queue, processor_class, proc_init_arguments))
             process.start()
+            startup_result = self.__out_queue.get()
+            if isinstance(startup_result, _Error):
+                self.shutdown()
+                raise RuntimeError(startup_result.exception_message)
             self.__processes.append(process)
 
 
@@ -106,7 +119,11 @@ class MultiProcessor:
                 num_queued += 1
 
             if num_results < len(items):
-                yield self.__out_queue.get()
+                result = self.__out_queue.get()
+                if not isinstance(result, _Error):
+                    yield result
+                else:
+                    raise Exception(_Error.exception_message)
                 num_results += 1
                 if progress_label is not None:
                     print_progress(num_results, len(items), progress_label)
@@ -124,16 +141,28 @@ class MultiProcessor:
         for proc in self.__processes:
             proc.join()
 
+        self.__processes = []
+
 
     @staticmethod
     def __runner(in_queue: mp.Queue, out_queue: mp.Queue, processor_class: Type, proc_init_arguments: Tuple) -> None:
-        processor = processor_class(*proc_init_arguments)
+        try:
+            processor = processor_class(*proc_init_arguments)
+            out_queue.put(_Ready())
+        except BaseException as e:
+            message = ''.join(traceback.format_exception(*sys.exc_info()))
+            out_queue.put(_Error(message))
+            sys.exit()
 
         while True:
             arguments = in_queue.get()
             if isinstance(arguments, _Stop):
                 break
-            result = processor.process(*arguments)
-            out_queue.put(result)
+            try:
+                result = processor.process(*arguments)
+                out_queue.put(result)
+            except BaseException as e:
+                message = ''.join(traceback.format_exception(*sys.exc_info()))
+                out_queue.put(_Error(message))
 
         sys.exit()

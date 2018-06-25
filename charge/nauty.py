@@ -97,7 +97,6 @@ class Nauty:
         if core:
             colors, core = list(zip(*(
                 (graph.node[nodes[idx]][color_key], nodes[idx] == core) for idx in map(int, lines[0].split()))))
-            print([adj, colors, core])
             return hashlib.md5(msgpack.packb([adj, colors, core])).hexdigest()
         else:
             colors = [graph.node[nodes[idx]][color_key] for idx in map(int, lines[0].split())]

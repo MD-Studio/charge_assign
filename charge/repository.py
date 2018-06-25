@@ -61,8 +61,8 @@ class Repository:
                 self.__min_shell, self.__max_shell = msgpack.unpackb(zf.read('meta'), encoding='utf-8')
                 self.charges_iacm = msgpack.unpackb(zf.read('charges_iacm'), encoding='utf-8')
                 self.charges_elem = msgpack.unpackb(zf.read('charges_elem'), encoding='utf-8')
-                self.__iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
-                self.__iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
+                self.iso_iacm = msgpack.unpackb(zf.read('iso_iacm'), encoding='utf-8')
+                self.iso_elem = msgpack.unpackb(zf.read('iso_elem'), encoding='utf-8')
 
     def __create(self, data_location: str, processes:int, iacm_to_elements: bool=False) -> None:
         molids = [fn.replace(self.__ext, '')
@@ -133,17 +133,19 @@ class Repository:
                     worker.terminate()
 
         if not iacm_to_elements:
-            self.__iso_iacm = defaultdict(list)
+            self.iso_iacm = defaultdict(list)
         else:
-            self.__iso_elem = defaultdict(list)
+            self.iso_elem = defaultdict(list)
+
+        molids.sort(key=lambda molid: canons[molid])
         for _, group in groupby(molids, key=lambda molid: canons[molid]):
             isomorphics = list(group)
             if len(isomorphics) > 1:
                 for molid in isomorphics:
                     if not iacm_to_elements:
-                        self.__iso_iacm[molid] = isomorphics
+                        self.iso_iacm[molid] = isomorphics
                     else:
-                        self.__iso_elem[molid] = isomorphics
+                        self.iso_elem[molid] = isomorphics
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
             if not iacm_to_elements:
@@ -153,15 +155,16 @@ class Repository:
                 for key, values in self.charges_elem[shell].items():
                     self.charges_elem[shell][key] = sorted(values)
 
-    def __iterate(self, data_location: str, molid: int,
+    def __iterate(self, data_location: str, molid: int, with_iso: bool,
                   callable_iacm: Callable[[int, str, float], None],
                   callable_elem: Callable[[int, str, float], None]):
         ids_iacm = {molid}
         ids_elem = {molid}
-        if molid in self.__iso_iacm:
-            ids_iacm.union(set(self.__iso_iacm[molid]))
-        if molid in self.__iso_elem:
-            ids_iacm.union(set(self.__iso_elem[molid]))
+        if with_iso:
+            if molid in self.iso_iacm:
+                ids_iacm.union(set(self.iso_iacm[molid]))
+            if molid in self.iso_elem:
+                ids_iacm.union(set(self.iso_elem[molid]))
 
         for molid in ids_iacm:
             with open(os.path.join(data_location, '%d%s' % (molid, self.__ext)), 'r') as f:
@@ -179,7 +182,8 @@ class Repository:
                     for key, partial_charge in iter_atomic_fragments(graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
 
-    def add(self, data_location: str, molid: int):
+    # TODO optional: add/subtract isomorphic molids
+    def add(self, data_location: str, molid: int, with_iso: bool=False):
         def a(shell, key, partial_charge, repo):
             if not shell in repo:
                 repo[shell] = dict()
@@ -187,20 +191,21 @@ class Repository:
                 repo[shell][key] = []
             bisect.insort_left(repo[shell][key], partial_charge)
 
-        self.__iterate(data_location, molid,
+        self.__iterate(data_location, molid, with_iso,
             lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_iacm),
             lambda shell, key, partial_charge: a(shell, key, partial_charge, self.charges_elem)
         )
 
-    def subtract(self,  data_location: str, molid: int):
+    def subtract(self,  data_location: str, molid: int, with_iso: bool=False):
         def s(shell, key, partial_charge, repo):
-            repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
-            if len(repo[shell][key]) == 0:
-                del repo[shell][key]
-            if len(repo[shell]) == 0:
-                del repo[shell]
+            if shell in repo and key in repo[shell]:
+                repo[shell][key].pop(bisect.bisect_left(repo[shell][key], partial_charge))
+                if len(repo[shell][key]) == 0:
+                    del repo[shell][key]
+                if len(repo[shell]) == 0:
+                    del repo[shell]
 
-        self.__iterate(data_location, molid,
+        self.__iterate(data_location, molid, with_iso,
             lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_iacm),
             lambda shell, key, partial_charge: s(shell, key, partial_charge, self.charges_elem))
 
@@ -209,8 +214,8 @@ class Repository:
             zf.writestr('meta', msgpack.packb((self.__min_shell, self.__max_shell)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
-            zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
-            zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
+            zf.writestr('iso_iacm', msgpack.packb(self.iso_iacm))
+            zf.writestr('iso_elem', msgpack.packb(self.iso_elem))
 
 
 def iter_queue(pool: List[Process], queue: Queue, sleep: float=0.1):
@@ -242,6 +247,7 @@ def read_worker(molids: List, data_location: str, iacm_to_elements: bool, ext: s
             if iacm_to_elements:
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
+
             canon = nauty.canonize(graph)
             out_q.put((molid, graph, canon))
         progress.value += 1

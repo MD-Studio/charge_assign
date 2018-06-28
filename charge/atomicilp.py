@@ -33,8 +33,10 @@ class AtomicILPCharger(Charger):
         else:
             raise RuntimeError('No solver found.')
 
-    def _set_partial_charges(self, graph: nx.Graph, iacm_only: bool, shell: int, **kwargs) -> bool:
+    def _set_partial_charges(self, graph: nx.Graph, iacm_only: bool,
+                             shell: int, rounding_digits: int, **kwargs) -> bool:
         shells = sorted(self._repo.charges_iacm.keys(), reverse=True) if shell < 0 else [shell]
+        rounding_digits = max(rounding_digits, 0)
 
         w = dict()
         c = dict()
@@ -45,15 +47,25 @@ class AtomicILPCharger(Charger):
             if 'total_charge_diff' in kwargs else DEFAULT_TOTAL_CHARGE_DIFF
         max_bins = int(kwargs['max_bins']) if 'max_bins' in kwargs else MAX_BINS
 
-        def process_vals(values):
+        def process_vals(values, atom):
             hist, bin_edges = np.histogram(values)
             if len(hist) > max_bins:
                 hist, bin_edges = np.histogram(values, bins=max_bins)
-            charges = [bin_edges[i] + 0.5 * (bin_edges[i + 1] - bin_edges[i]) for i in range(len(bin_edges) - 1)]
-            hist, charges = zip(*[(freq, charge) for freq, charge in zip(hist, charges) if freq > 0])
-            w[atom] = hist / sum(hist)
-            c[atom] = charges
-            idx[atom] = list(range(len(hist)))
+
+            charges = [round(bin_edges[i] + 0.5 * (bin_edges[i + 1] - bin_edges[i]), rounding_digits)\
+                       for i in range(len(bin_edges) - 1)]
+            filtered_hist, filtered_charges = [hist[0]], [charges[0]]
+            for count, charge in zip(hist[1:], charges[1:]):
+                if count > 0:
+                    if charge == filtered_charges[-1]:
+                        filtered_hist[-1] += count
+                    else:
+                        filtered_charges.append(charge)
+                        filtered_hist.append(count)
+
+            w[atom] = [count / sum(filtered_hist) for count in filtered_hist]
+            c[atom] = filtered_charges
+            idx[atom] = list(range(len(filtered_hist)))
 
         def assign(atom):
             for shell in shells:
@@ -61,12 +73,12 @@ class AtomicILPCharger(Charger):
                                                         color_key='iacm' if 'iacm' in graph.node[
                                                              atom] else 'atom_type')
                 if key in self._repo.charges_iacm[shell]:
-                    process_vals(self._repo.charges_iacm[shell][key])
+                    process_vals(self._repo.charges_iacm[shell][key], atom)
                     break
                 elif not iacm_only:
                     key = self._nauty.canonize_neighborhood(graph, atom, shell)
                     if key in self._repo.charges_elem[shell]:
-                        process_vals(self._repo.charges_elem[shell][key])
+                        process_vals(self._repo.charges_elem[shell][key], atom)
                         break
             else:
                 warnings.warn(AssignmentError('Could not assign charge to atom {0}'.format(atom)))

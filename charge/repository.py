@@ -43,8 +43,8 @@ class Repository:
 
         self.charges_iacm = defaultdict(lambda: defaultdict(list))
         self.charges_elem = defaultdict(lambda: defaultdict(list))
-        self.__iso_iacm = defaultdict(list)
-        self.__iso_elem = defaultdict(list)
+        self.iso_iacm = defaultdict(list)
+        self.iso_elem = defaultdict(list)
 
     @staticmethod
     def create_from(
@@ -78,17 +78,20 @@ class Repository:
         # process with iacm atom types
         repo.charges_iacm = repo.__generate_charges(graphs)
         canons = repo.__make_canons(graphs)
-        repo.__iso_iacm = repo.__make_isomorphics(molids, canons)
+        repo.iso_iacm = repo.__make_isomorphics(molids, canons)
 
         # convert to plain elements
-        for _, graph in graphs:
+        for molid, graph in graphs:
             for v, data in graph.nodes(data=True):
+                if data['atom_type'] not in IACM_MAP:
+                    print('Unknown atom_type {} in molid {}'.format(
+                        data['atom_type'], molid))
                 graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
 
         # process as plain elements
         repo.charges_elem = repo.__generate_charges(graphs)
         canons = repo.__make_canons(graphs)
-        repo.__iso_elem = repo.__make_isomorphics(molids, canons)
+        repo.iso_elem = repo.__make_isomorphics(molids, canons)
 
         return repo
 
@@ -112,9 +115,9 @@ class Repository:
                     zf.read('charges_iacm'), encoding='utf-8')
             repo.charges_elem = msgpack.unpackb(
                     zf.read('charges_elem'), encoding='utf-8')
-            repo.__iso_iacm = msgpack.unpackb(
+            repo.iso_iacm = msgpack.unpackb(
                     zf.read('iso_iacm'), encoding='utf-8')
-            repo.__iso_elem = msgpack.unpackb(
+            repo.iso_elem = msgpack.unpackb(
                     zf.read('iso_elem'), encoding='utf-8')
         return repo
 
@@ -129,9 +132,10 @@ class Repository:
                 (self.__min_shell, self.__max_shell)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
-            zf.writestr('iso_iacm', msgpack.packb(self.__iso_iacm))
-            zf.writestr('iso_elem', msgpack.packb(self.__iso_elem))
+            zf.writestr('iso_iacm', msgpack.packb(self.iso_iacm))
+            zf.writestr('iso_elem', msgpack.packb(self.iso_elem))
 
+    # TODO optional: add/subtract isomorphic molids
     def add(self, data_location: str, molid: int, data_type: IOType) -> None:
         """Add a new molecule to the Repository.
 
@@ -168,12 +172,13 @@ class Repository:
             data_type Type of file to load.
         """
         def s(shell, key, partial_charge, repo):
-            repo[shell][key].pop(
-                    bisect.bisect_left(repo[shell][key], partial_charge))
-            if len(repo[shell][key]) == 0:
-                del repo[shell][key]
-            if len(repo[shell]) == 0:
-                del repo[shell]
+            if shell in repo and key in repo[shell]:
+                repo[shell][key].pop(
+                        bisect.bisect_left(repo[shell][key], partial_charge))
+                if len(repo[shell][key]) == 0:
+                    del repo[shell][key]
+                if len(repo[shell]) == 0:
+                    del repo[shell]
 
         self.__iterate(
                 data_location, molid, data_type,
@@ -251,10 +256,10 @@ class Repository:
             callable_elem: Callable[[int, str, float], None]):
         ids_iacm = {molid}
         ids_elem = {molid}
-        if molid in self.__iso_iacm:
-            ids_iacm.union(set(self.__iso_iacm[molid]))
-        if molid in self.__iso_elem:
-            ids_iacm.union(set(self.__iso_elem[molid]))
+        if molid in self.iso_iacm:
+            ids_iacm.union(set(self.iso_iacm[molid]))
+        if molid in self.iso_elem:
+            ids_iacm.union(set(self.iso_elem[molid]))
 
         extension = data_type.get_extension()
 

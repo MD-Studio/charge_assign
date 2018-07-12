@@ -8,8 +8,8 @@ def test_create_empty():
     assert repo._Repository__max_shell == 7
     assert len(repo.charges_iacm) == 0
     assert len(repo.charges_elem) == 0
-    assert len(repo._Repository__iso_iacm) == 0
-    assert len(repo._Repository__iso_elem) == 0
+    assert len(repo.iso_iacm) == 0
+    assert len(repo.iso_elem) == 0
 
 
 def test_set_shell_sizes():
@@ -33,5 +33,5 @@ def test_create_from_dir(lgf_data_dir):
     assert len(repo.charges_elem[2]) == 7
     assert len(repo.charges_elem[3]) == 7
 
-    assert len(repo._Repository__iso_iacm) == 2
-    assert len(repo._Repository__iso_elem) == 2
+    assert len(repo.iso_iacm) == 2
+    assert len(repo.iso_elem) == 2

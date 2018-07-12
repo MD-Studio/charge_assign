@@ -1,7 +1,9 @@
 import networkx as nx
+from pathlib import Path
 import pytest
 
 from charge.bond_type import BondType
+from charge.nauty import Nauty
 
 # Fixtures for testing loading and saving to and from various
 # formats.
@@ -188,3 +190,64 @@ def ref_graph_shifted(ref_graph_attributes, ref_graph_nodes_shifted, ref_graph_e
     graph.add_nodes_from(ref_graph_nodes_shifted)
     graph.add_edges_from(ref_graph_edges_shifted)
     return graph
+
+
+# Fixtures for testing repository building.
+
+@pytest.fixture
+def nauty():
+    nauty = Nauty()
+    yield nauty
+    nauty.__del__()
+
+
+@pytest.fixture
+def ref_graph2_nodes():
+    return [(5, {'atom_type': 'HC', 'label': 'H1', 'charge_group': 0}),
+            (4, {'atom_type': 'HC', 'label': 'H2', 'charge_group': 0}),
+            (2, {'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
+            (3, {'atom_type': 'HC', 'label': 'H3', 'charge_group': 0}),
+            (1, {'atom_type': 'HC', 'label': 'H4', 'charge_group': 0})]
+
+
+@pytest.fixture
+def ref_graph2_edges():
+    return [(5, 2, {'bond_type': BondType.UNKNOWN}),
+            (2, 3, {'bond_type': BondType.UNKNOWN}),
+            (2, 4, {'bond_type': BondType.UNKNOWN}),
+            (2, 1, {'bond_type': BondType.UNKNOWN})]
+
+
+@pytest.fixture
+def ref_graph2(ref_graph_attributes, ref_graph2_nodes, ref_graph2_edges):
+    graph = nx.Graph(**ref_graph_attributes)
+    graph.add_nodes_from(ref_graph2_nodes)
+    graph.add_edges_from(ref_graph2_edges)
+    return graph
+
+
+@pytest.fixture
+def lgf_data_dir():
+    this_file = Path(__file__)
+    return this_file.parent / 'sample_lgf'
+
+
+@pytest.fixture
+def ref_graph_nauty_output():
+    return (
+            '[fixing partition]\n'
+            '(3 4)\n'
+            'level 3:  4 orbits; 3 fixed; index 2\n'
+            '(2 3)\n'
+            'level 2:  3 orbits; 2 fixed; index 3\n'
+            '(1 2)\n'
+            'level 1:  2 orbits; 1 fixed; index 4\n'
+            '2 orbits; grpsize=24; 3 gens; 10 nodes; maxlev=4\n'
+            'canupdates=1; cpu time = 0.00 seconds\n'
+            '1 2 3 4 0\n'
+            '0 :  4;\n'
+            '1 :  4;\n'
+            '2 :  4;\n'
+            '3 :  4;\n'
+            '4 :  0 1 2 3;\n'
+            'END')

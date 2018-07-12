@@ -1,0 +1,13 @@
+@nodes
+partial_charge	label	label2	atomType	coordX	coordY	coordZ	initColor	
+0.077	1	H3	20	0	0	0	4	
+0.017	2	C1	12	0	0	0	3	
+-0.248	3	F1	32	0	0	0	2	
+0.077	4	H1	20	0	0	0	1	
+0.077	5	H2	20	0	0	0	0	
+@edges
+		label	
+1	2	0	
+2	3	1	
+2	4	2	
+2	5	3	

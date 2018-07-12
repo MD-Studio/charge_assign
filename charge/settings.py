@@ -24,12 +24,12 @@ REPO_LOCATION='atb_0_3.zip'
 IACM_MAP = {
         'O': 'O', 'OM': 'O', 'OA': 'O', 'OE': 'O', 'OW': 'O', 'N': 'N',
         'NT': 'N', 'NL': 'N', 'NR': 'N', 'NZ': 'N', 'NE': 'N',
-        'C': 'C', 'CH0': 'C', 'CH1': 'C', 'CH2': 'C', 'CH3': 'C', 'CH4': 'C', 'CH2r': 'C', 'CR1': 'C', 'HC': 'H', 'H': 'H',
-        'DUM': None, 'S': 'S', 'CU1+': 'Cu', 'CU2+': 'Cu', 'FE': 'Fe', 'ZN2+': 'Zn', 'MG2+': 'Mg', 'CA2+': 'Ca', 'P,SI': None,
+        'C': 'C', 'CH0': 'C', 'CH1': 'C', 'CH2': 'C', 'CH3': 'C', 'CH4': 'C', 'CH2r': 'C', 'CR1': 'C', 'CC14': 'C', 'HC': 'H', 'H': 'H',
+        'DUM': None, 'S': 'S', 'CU1+': 'Cu', 'CU2+': 'Cu', 'FE': 'Fe', 'ZN2+': 'Zn', 'MG2+': 'Mg', 'CA2+': 'Ca', 'P,SI': 'P',
         'AR': 'Ar', 'F': 'F', 'CL': 'Cl', 'BR': 'Br', 'CMet': 'C', 'OMet': 'O', 'NA+': 'Na', 'CL-': 'Cl', 'CChl': 'C',
         'CLChl': 'Cl', 'HChl': 'H', 'SDmso': 'S', 'CDmso': 'C', 'ODmso': 'O', 'CCl4': 'C', 'CLCl4': 'Cl', 'FTFE': 'F',
         'CTFE': 'C', 'CHTFE': 'C', 'OTFE': 'O', 'CUrea': 'C', 'OUrea': 'O', 'NUrea': 'N', 'CH3p': 'C', 'I': 'I', 'CLOpt': 'Cl',
-        'B': 'B', 'SE': 'SE', 'HS14': 'H', 'CLAro': 'CL', 'BROpt': 'Br', 'OEOpt': 'O', 'NOpt': 'N', 'CAro': 'C', 'CPos': 'C',
+        'B': 'B', 'SE': 'Se', 'HS14': 'H', 'CLAro': 'Cl', 'BROpt': 'Br', 'OEOpt': 'O', 'NOpt': 'N', 'CAro': 'C', 'CPos': 'C',
         'NPri': 'N', 'NTer': 'N', 'OAlc': 'O', 'P': 'P', 'SI': 'Si',
     }
 

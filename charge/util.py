@@ -1,10 +1,12 @@
 from collections import deque
+from time import perf_counter
 from typing import Any
 
 import networkx as nx
 
 from charge.babel import BondType
 
+_last_print = 0.0
 
 def print_progress(iteration:int,
                    total:int,
@@ -14,7 +16,7 @@ def print_progress(iteration:int,
                    length:int=50,
                    fill:str='#') -> None:
     """Call in a loop to create terminal progress bar
-    
+
         :param iteration: current iteration
         :type iteration: int
         :param total: total iterations
@@ -30,13 +32,19 @@ def print_progress(iteration:int,
         :param fill : bar fill character
         :type fill: str
     """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s\033[K' % (prefix, bar, percent, suffix), end = '', flush=True)
+    global _last_print
+    cur_time = perf_counter()
+    been_a_while = cur_time - _last_print > 0.2
 
-    if iteration == total:
-        print()
+    if iteration == 0 or iteration == total or been_a_while:
+        _last_print = cur_time
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + '-' * (length - filledLength)
+        print('\r%s |%s| %s%% %s\033[K' % (prefix, bar, percent, suffix), end = '', flush=True)
+
+        if iteration == total:
+            print()
 
 
 def bfs_nodes(G: nx.Graph, source: Any, max_depth:int=0):

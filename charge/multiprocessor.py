@@ -67,7 +67,7 @@ class MultiProcessor:
 
         queue_length = 2 * num_processes
         self.__in_queue = mp.Queue(queue_length)
-        self.__out_queue = mp.Queue(queue_length)
+        self.__out_queue = mp.Queue(queue_length + num_processes)
 
         self.__processes = []
         for i in range(num_processes):
@@ -120,11 +120,14 @@ class MultiProcessor:
 
             if num_results < len(items):
                 result = self.__out_queue.get()
+                num_results += 1
                 if not isinstance(result, _Error):
                     yield result
                 else:
-                    raise Exception(_Error.exception_message)
-                num_results += 1
+                    while num_results < num_queued:
+                        self.__out_queue.get()
+                        num_results += 1
+                    raise Exception(result.exception_message)
                 if progress_label is not None:
                     print_progress(num_results, len(items), progress_label)
 

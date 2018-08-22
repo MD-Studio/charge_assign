@@ -40,11 +40,12 @@ class Nauty:
 
     def __del__(self):
         try:
-            if not self.__process.poll():
-                self.__process.stdin.write('q'.encode('utf-8'))
-                self.__process.stdin.close()
-                self.__process.stdout.close()
-                self.__process.stderr.close()
+            if self.__process is not None:
+                if not self.__process.poll():
+                    self.__process.stdin.write('q'.encode('utf-8'))
+                    self.__process.stdin.close()
+                    self.__process.stdout.close()
+                    self.__process.stderr.close()
                 self.__process.wait(timeout=1)
         except ValueError:
             pass

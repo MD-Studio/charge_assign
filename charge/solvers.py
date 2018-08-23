@@ -205,7 +205,7 @@ class CDPSolver(Charger):
 
     def _assign_partial_charges(self, graph: nx.Graph, values: Dict, total_charge: int, **kwargs) -> bool:
 
-        import dp
+        import charge.c.dp as dp
 
         total_charge_diff = float(kwargs['total_charge_diff']) \
             if 'total_charge_diff' in kwargs else DEFAULT_TOTAL_CHARGE_DIFF

@@ -17,11 +17,11 @@ def ref_graph_attributes():
 
 @pytest.fixture
 def ref_graph_nodes():
-    return [(1, {'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
-            (2, {'atom_type': 'HC', 'label': 'H1', 'charge_group': 0}),
-            (3, {'atom_type': 'HC', 'label': 'H2', 'charge_group': 0}),
-            (4, {'atom_type': 'HC', 'label': 'H3', 'charge_group': 0}),
-            (5, {'atom_type': 'HC', 'label': 'H4', 'charge_group': 0})]
+    return [(1, {'iacm': 'C', 'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
+            (2, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H1', 'charge_group': 0}),
+            (3, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H2', 'charge_group': 0}),
+            (4, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H3', 'charge_group': 0}),
+            (5, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H4', 'charge_group': 0})]
 
 
 @pytest.fixture
@@ -146,11 +146,13 @@ def ref_graph_rdkit(ref_graph_nodes, ref_graph_edges):
     h3 = Chem.Atom('H')
     h4 = Chem.Atom('H')
 
+    c.SetProp('label', 'C1')
     h1.SetProp('label', 'H1')
     h2.SetProp('label', 'H2')
     h3.SetProp('label', 'H3')
     h4.SetProp('label', 'H4')
 
+    c.SetProp('atom_type', 'C')
     h1.SetProp('atom_type', 'HC')
     h2.SetProp('atom_type', 'HC')
     h3.SetProp('atom_type', 'HC')
@@ -203,11 +205,11 @@ def nauty():
 
 @pytest.fixture
 def ref_graph2_nodes():
-    return [(5, {'atom_type': 'HC', 'label': 'H1', 'charge_group': 0}),
-            (4, {'atom_type': 'HC', 'label': 'H2', 'charge_group': 0}),
-            (2, {'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
-            (3, {'atom_type': 'HC', 'label': 'H3', 'charge_group': 0}),
-            (1, {'atom_type': 'HC', 'label': 'H4', 'charge_group': 0})]
+    return [(5, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H1', 'charge_group': 0}),
+            (4, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H2', 'charge_group': 0}),
+            (2, {'iacm': 'C', 'atom_type': 'C', 'label': 'C1', 'charge_group': 0}),
+            (3, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H3', 'charge_group': 0}),
+            (1, {'iacm': 'HC', 'atom_type': 'H', 'label': 'H4', 'charge_group': 0})]
 
 
 @pytest.fixture

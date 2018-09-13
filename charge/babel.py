@@ -63,10 +63,13 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
 
         if nodes:
             if header:
+                # create a dict mapping column names to column indices
                 node_keys = dict((key, i) for i, key in enumerate(line.split()))
                 header = False
+                # label is the numerical id of the atom
                 if not 'label' in node_keys:
                     raise ValueError('Missing attribute "label".')
+                # atomType is the IACM atom type number
                 if not 'atomType' in node_keys:
                     raise ValueError('Missing attribute "atomType".')
             elif node_keys:
@@ -74,11 +77,14 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                 type_idx = int(values[node_keys['atomType']])-1
                 if type_idx < 0 or type_idx >= len(IACM_ELEMENTS):
                     raise ValueError('Unknown atom type: %d' % type_idx)
-                atom_type = IACM_ELEMENTS[type_idx]
+                iacm_atom_type = IACM_ELEMENTS[type_idx]
+                plain_atom_type = IACM_MAP[iacm_atom_type]
+                # label2 is the name, e.g. 'H4'
                 if 'label2' in node_keys:
                     label = values[node_keys['label2']]
                 else:
-                    el = IACM_MAP[atom_type]
+                    # make a name if there isn't one
+                    el = IACM_MAP[iacm_atom_type]
                     el_count[el] += 1
                     label = '{}{}'.format(el, el_count[el])
                 if 'initColor' in node_keys:
@@ -86,7 +92,14 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                     charge_groups.add(charge_group)
                 else:
                     charge_group = 0
-                attr = {'atom_type': atom_type, 'label': label, 'charge_group': charge_group}
+                # graph node is an int (from 'label')
+                # iacm: str is IACM symbolic atom type (from 'atomType')
+                # atom_type: str is the plain atom type (derived from IACM)
+                # label: str is the name of the atom (from 'label2' or generated)
+                # charge_group: int is the charge group the atom belongs to (from 'initColor')
+                attr = {
+                        'iacm': iacm_atom_type, 'atom_type': plain_atom_type,
+                        'label': label, 'charge_group': charge_group}
                 for key in node_keys:
                     if key == 'label' or key == 'atomType' or key == 'label2' or key == 'initColor':
                         continue
@@ -116,8 +129,12 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                         attr['bond_type'] = BondType.AROMATIC
                 else:
                     attr['bond_type'] = BondType.UNKNOWN
+                # 'label' is removed, rest becomes attributes
                 graph.add_edge(int(values[0]), int(values[1]), **attr)
 
+    # Assume all charge groups are perfect
+    # ATB data seem to have one-atom charge groups if they have them at all
+    # Anyway, it's never actually used
     if charge_groups:
         graph.graph['group_charges'] = dict((k, 0.0) for k in charge_groups)
     else:
@@ -131,18 +148,18 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
     out.write('@nodes\n')
 
     idxmap = {}
+    # make a set of all the unique keys in all the node attributes
     keys = set.union(*map(lambda n: set(n[1].keys()), graph.nodes(data=True)))
 
-    if not 'atom_type' in keys:
-        raise ValueError('Missing attribute "atom_type".')
+    if not 'atom_type' in keys and not 'iacm' in keys:
+        raise ValueError('Need at least one of "atom_type" and "iacm" attributes.')
 
-    keys.remove('atom_type')
     if 'label' in keys:
         keys.remove('label')
 
     out.write('label\tlabel2\tatomType\t')
     for k in keys:
-        if k == 'iacm':
+        if k == 'iacm' or k == 'atom_type':
             continue
         elif k == 'charge_group':
             out.write('initColor\t')
@@ -175,7 +192,7 @@ def __nx_to_lgf(graph: nx.Graph) -> str:
         out.write('%d\t%s\t%d\t' % (idx, label, iacm_num))
 
         for k in keys:
-            if k == 'iacm':
+            if k == 'iacm' or k == 'atom_type':
                 continue
             if k in data:
                 out.write('%s\t' % str(data[k]))
@@ -234,10 +251,11 @@ def __gml_to_nx(obj: str) -> nx.Graph:
             data['partial_charge'] = data.pop('partialcharge')
         if not 'atomtype' in data:
             raise ValueError('Missing attribute "atomtype" for atom {0}'.format(v))
-        data['atom_type'] = data.pop('atomtype')
-        if not data['atom_type'] in IACM_ELEMENTS:
+        data['iacm'] = data.pop('atomtype')
+        if not data['iacm'] in IACM_ELEMENTS:
             raise ValueError('Unknown "atom_type" for atom {0}: {1}'.format(v, data['atom_type']))
-        element = IACM_MAP[data['atom_type']]
+        element = IACM_MAP[data['iacm']]
+        data['atom_type'] = element
         el_count[element] += 1
         if not 'label' in data or not isinstance('label', str):
             data['label'] = '%s%d' % (element, el_count[element])
@@ -278,7 +296,7 @@ def __nx_to_gml(graph: nx.Graph) -> str:
     el_count = defaultdict(int)
 
     for _, data in cp.nodes(data=True):
-        element = IACM_MAP[data['atom_type']]
+        element = IACM_MAP[data['iacm']]
         el_count[element] += 1
         if not 'label' in data or not isinstance('label', str):
             data['label'] = '%s%d' % (element, el_count[element])
@@ -317,13 +335,17 @@ def __rdmol_to_nx(obj: Any) -> nx.Graph:
     graph = nx.Graph()
     el_count = defaultdict(int)
     group_charges = {}
-    
+
     for atom in obj.GetAtoms():
         props = atom.GetPropsAsDict()
 
         element = atom.GetSymbol()
         el_count[element] += 1
-        if not 'atom_type' in props:
+        if 'atom_type' in props:
+            props['iacm'] = props['atom_type']
+            if props['iacm'] not in IACM_MAP:
+                raise ValueError('Unknown atom type: %s' % props['iacm'])
+            element = IACM_MAP[props['iacm']]
             props['atom_type'] = element
         if not 'charge_group' in props or not isinstance(props['charge_group'], int):
             props['charge_group'] = 0
@@ -331,7 +353,7 @@ def __rdmol_to_nx(obj: Any) -> nx.Graph:
         if not 'label' in props or not isinstance(props['label'], str):
             props['label'] = '%s%d' % (element, el_count[element])
         graph.add_node(atom.GetIdx(), **props)
-    
+
     for bond in obj.GetBonds():
         props = bond.GetPropsAsDict()
         props['rdkit_bond_type'] = bond.GetBondType()
@@ -497,7 +519,9 @@ def __itp_to_nx(obj: Any) -> nx.Graph:
                     atom_type = values[node_keys.index('type')]
                     if not atom_type in IACM_MAP:
                         raise ValueError('Unknown atom type: {}'.format(atom_type))
-                    attr = {'atom_type': atom_type,
+                    element = IACM_MAP[atom_type]
+                    attr = {'iacm': atom_type,
+                            'atom_type': element,
                             'label': values[node_keys.index('atom')]}
                     if 'charge' in node_keys:
                         attr['partial_charge'] = values[node_keys.index('charge')]

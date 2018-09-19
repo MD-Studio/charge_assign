@@ -1,4 +1,8 @@
-from setuptools import setup
+from setuptools import setup, Extension
+
+dp_module = Extension('_dp',
+        sources=['charge/c/dp_wrap.c', 'charge/c/dp.c'])
+
 setup(
         name = 'charge_assign',
         packages = ['charge'],
@@ -13,8 +17,10 @@ setup(
         install_requires=[
                 'msgpack-python>=0.4.8',
                 'networkx==2.0',
-                'numpy>=1.14.0,<2'
+                'numpy>=1.14.0,<2',
+                'pulp>=1.6.8'
             ],
+        ext_modules = [dp_module],
         extras_require={
             'dev': [
                 'pytest',

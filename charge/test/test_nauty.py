@@ -23,7 +23,7 @@ def test_canonize_neighborhood_graph_1(nauty, ref_graph):
     assert key == ref_key
 
 def test_canonize_neighborhood_graph_2(nauty, ref_graph):
-    key = nauty.canonize_neighborhood(ref_graph, 1, 1)
+    key = nauty.canonize_neighborhood(ref_graph, 1, 1, 'iacm')
     ref_key = nauty._Nauty__make_hash(
             [(False, 'HC'), (False, 'HC'), (False, 'HC'), (False, 'HC'), (True, 'C')],
             [(0, 4), (1, 4), (2, 4), (3, 4), (4, 0), (4, 1), (4, 2), (4, 3)])

@@ -1,2 +1,4 @@
 [run]
 concurrency = multiprocessing
+omit =
+    charge/c/dp.py

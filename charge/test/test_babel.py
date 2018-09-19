@@ -10,8 +10,8 @@ def equal_attributes(att1, att2):
 
 def assert_same_graph(graph, ref_graph):
     assert graph.graph == ref_graph.graph
-    assert graph.nodes == ref_graph.nodes
-    assert graph.edges == ref_graph.edges
+    assert list(graph.nodes) == list(ref_graph.nodes)
+    assert list(graph.edges) == list(ref_graph.edges)
     assert nxiso.is_isomorphic(graph, ref_graph,
             node_match=equal_attributes, edge_match=equal_attributes)
 

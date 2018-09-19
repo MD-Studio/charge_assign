@@ -1,52 +1,118 @@
+from abc import ABC
 import itertools
 from time import perf_counter
-from typing import Dict
+from typing import Dict, Tuple
 
 import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
-from charge.base import Charger
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
+from charge.types import Atom, ChargeList, WeightList
+from charge.util import AssignmentError
 
 
-class SimpleSolver(Charger):
+class Solver(ABC):
+    """Base class for solvers.
 
-    def _assign_partial_charges(self, graph: nx.Graph, values: Dict, total_charge: int, **kwargs) -> bool:
+    Solvers assign charges to atoms based on charge distribution \
+    histograms obtained by a Collector.
+    """
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
 
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
+        raise NotImplemented()
+
+
+class SimpleSolver(Solver):
+    """A trivial solver that assigns the mean of the found charges.
+
+    Use the MeanCollector to produce appropriate charge distributions.
+    """
+    def __init__(self, rounding_digits: int) -> None:
+        self.__rounding_digits = rounding_digits
+
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
+
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
+
+        This solver expects a single charge value for each atom, and \
+        assigns it to that atom. With charge distributions from the \
+        MeanCollector, it assigns the mean of the found charges.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
         solutionTime = -perf_counter()
 
         profit = 0
         charge = 0
-        for atom, (pc, score) in values.items():
-            graph.node[atom]['partial_charge'] = pc
-            graph.node[atom]['score'] = score
-            charge += pc
-            profit += score
+        for atom, (pcs, scores) in charge_dists.items():
+            graph.node[atom]['partial_charge'] = pcs[0]
+            graph.node[atom]['score'] = scores[0]
+            charge += pcs[0]
+            profit += scores[0]
 
         solutionTime += perf_counter()
 
-        graph.graph['total_charge'] = round(charge, self._rounding_digits)
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
         graph.graph['score'] = profit
         graph.graph['time'] = solutionTime
         graph.graph['items'] = 'nan'
         graph.graph['scaled_capacity'] = 'nan'
 
-        return True
 
+class ILPSolver(Solver):
+    """An optimizing solver using Integer Linear Programming.
 
-class ILPSolver(Charger):
+    Use the HistogramCollector to produce appropriate charge \
+    distributions.
+    """
 
     def __init__(self,
-                 repository: Repository = None,
-                 nauty: Nauty = None,
-                 rounding_digits: int = ROUNDING_DIGITS,
-                 **kwargs) -> None:
-        super().__init__(repository, nauty, rounding_digits, **kwargs)
+                 rounding_digits: int=ROUNDING_DIGITS,
+                 max_seconds: int=ILP_SOLVER_MAX_SECONDS
+                 ) -> None:
+        """Create an ILPSolver.
 
-        max_seconds = int(kwargs['max_seconds']) if 'max_seconds' in kwargs else ILP_SOLVER_MAX_SECONDS
+        Args:
+            rounding_digits: Number of digits to round the charges to.
+            max_seconds: Maximum run-time to spend searching for a \
+                    solution
+        """
+        self.__rounding_digits = rounding_digits
 
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)
@@ -59,12 +125,35 @@ class ILPSolver(Charger):
         elif COIN_CMD().available():
             self.__solver = COIN_CMD(maxSeconds=max_seconds)
         else:
-            raise RuntimeError('No solver found.')
+            raise RuntimeError('No solver found, there is something'
+                    ' wrong with your pulp library setup.')
 
-    def _assign_partial_charges(self, graph: nx.Graph, values: Dict, total_charge: int, **kwargs) -> bool:
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
 
-        total_charge_diff = float(kwargs['total_charge_diff']) \
-            if 'total_charge_diff' in kwargs else DEFAULT_TOTAL_CHARGE_DIFF
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
+
+        This solver formulates the epsilon-Multiple Choice Knapsack \
+        Problem as an Integer Linear Programming problem and then uses \
+        a generic ILP solver from the pulp library to produce optimised \
+        charges.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
 
         atom_idx = dict()
         idx = list()
@@ -73,7 +162,7 @@ class ILPSolver(Charger):
         # profits = frequencies
         profits = dict()
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(values.items()):
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(list(zip(itertools.repeat(k), range(len(charges)))))
             weights[k] = charges
@@ -98,16 +187,18 @@ class ILPSolver(Charger):
         charging_problem +=\
             sum([weights[k][i] * x[(k, i)] for k, i in itertools.chain.from_iterable(idx)]) - total_charge\
             >= -total_charge_diff
-	
+
         solutionTime = -perf_counter()
         try:
             charging_problem.solve(solver=self.__solver)
         except:
-            return False
+            raise AssignmentError('Could not solve ILP problem. Please retry'
+                    ' with a SimpleCharger')
         solutionTime += perf_counter()
 
         if not charging_problem.status == LpStatusOptimal:
-            return False
+            raise AssignmentError('Could not solve ILP problem. Please retry'
+                    ' with a SimpleCharger')
 
         solution = []
         profit = 0
@@ -120,24 +211,58 @@ class ILPSolver(Charger):
                 profit += profits[k][i]
                 charge += graph.nodes[atom_idx[k]]['partial_charge']
 
-        graph.graph['total_charge'] = round(charge, self._rounding_digits)
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
         graph.graph['score'] = profit
         graph.graph['time'] = solutionTime
         graph.graph['items'] = len(x)
         graph.graph['scaled_capacity'] = pos_total + total_charge_diff
 
-        return True
+
+class DPSolver(Solver):
+    """An optimizing solver using Dynamic Programming.
+
+    Use the HistogramCollector to produce appropriate charge \
+    distributions.
+    """
+    def __init__(self, rounding_digits) -> None:
+        """Create a DPSolver.
+
+        Args:
+            rounding_digits: How many significant digits to round the \
+                    resulting charges to.
+        """
+        self.__rounding_digits = rounding_digits
 
 
-class DPSolver(Charger):
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
 
-    def _assign_partial_charges(self, graph: nx.Graph, values: Dict, total_charge: int, **kwargs) -> bool:
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
 
-        total_charge_diff = float(kwargs['total_charge_diff']) \
-            if 'total_charge_diff' in kwargs else DEFAULT_TOTAL_CHARGE_DIFF
+        This solver uses Dynamic Programming to solve the \
+        epsilon-Multiple Choice Knapsack Problem. This is the Python \
+        version of the algorithm, see CDPSolver for a faster \
+        implementation.
 
-        blowup = 10 ** self._rounding_digits
-        deflate = 10 ** (-self._rounding_digits)
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
+
+        blowup = 10 ** self.__rounding_digits
+        deflate = 10 ** (-self.__rounding_digits)
 
         atom_idx = dict()
         idx = list()
@@ -149,7 +274,7 @@ class DPSolver(Charger):
         solutionTime = -perf_counter()
 
         pos_total_charge = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(values.items()):
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(zip(itertools.repeat(k), range(len(charges))))
             w_min[k] = min(charges)
@@ -181,37 +306,71 @@ class DPSolver(Charger):
         solutionTime += perf_counter()
 
         if max_val == -float('inf'):
-            return False
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                    ' with a SimpleCharger')
 
         solution = tb[lower + max_pos]
 
         charge = 0
         for i, j in enumerate(solution):
             graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
-                                                              self._rounding_digits)
+                                                              self.__rounding_digits)
             graph.node[atom_idx[i]]['score'] = items[i][j][2]
             charge += graph.node[atom_idx[i]]['partial_charge']
 
-        graph.graph['total_charge'] = round(charge, self._rounding_digits)
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
         graph.graph['score'] = max_val
         graph.graph['time'] = solutionTime
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
 
-        return True
 
+class CDPSolver(Solver):
+    """An optimizing solver using Dynamic Programming, C version.
 
-class CDPSolver(Charger):
+    Use the HistogramCollector to produce appropriate charge \
+    distributions.
+    """
+    def __init__(self, rounding_digits) -> None:
+        """Create a CDPSolver.
 
-    def _assign_partial_charges(self, graph: nx.Graph, values: Dict, total_charge: int, **kwargs) -> bool:
+        Args:
+            rounding_digits: How many significant digits to round the \
+                    resulting charges to.
+        """
+        self.__rounding_digits = rounding_digits
 
-        import dp
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
 
-        total_charge_diff = float(kwargs['total_charge_diff']) \
-            if 'total_charge_diff' in kwargs else DEFAULT_TOTAL_CHARGE_DIFF
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
 
-        num_sets = len(values)
-        num_items = sum(len(charges) for (_, (charges, _)) in values.items())
+        This solver uses Dynamic Programming to solve the \
+        epsilon-Multiple Choice Knapsack Problem. This is the Python \
+        version of the algorithm, see DPSolver for the Python \
+        implementation.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
+
+        import charge.c.dp as dp
+
+        num_sets = len(charge_dists)
+        num_items = sum(len(charges) for (_, (charges, _)) in charge_dists.items())
 
         atom_idx = dict()
 
@@ -222,7 +381,7 @@ class CDPSolver(Charger):
 
         offset = 0
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(values.items()):
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             dp.ushorta_setitem(sets, k, len(charges))
             for i, (charge, frequency) in enumerate(zip(charges, frequencies)):
@@ -235,7 +394,7 @@ class CDPSolver(Charger):
 
         profit = dp.solve_dp(weights, profits,
                              sets, num_items, num_sets,
-                             self._rounding_digits, total_charge, total_charge_diff,
+                             self.__rounding_digits, total_charge, total_charge_diff,
                              solution)
 
         solutionTime += perf_counter()
@@ -250,7 +409,7 @@ class CDPSolver(Charger):
                 charge += graph.node[atom_idx[k]]['partial_charge']
                 offset += dp.ushorta_getitem(sets, k)
 
-            graph.graph['total_charge'] = round(charge, self._rounding_digits)
+            graph.graph['total_charge'] = round(charge, self.__rounding_digits)
             graph.graph['score'] = profit
             graph.graph['time'] = solutionTime
             graph.graph['items'] = num_items
@@ -261,4 +420,6 @@ class CDPSolver(Charger):
         dp.delete_ushorta(sets)
         dp.delete_ushorta(solution)
 
-        return profit >= 0
+        if profit < 0:
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                    ' with a SimpleCharger')

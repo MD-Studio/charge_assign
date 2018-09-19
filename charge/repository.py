@@ -16,6 +16,12 @@ from charge.settings import REPO_LOCATION, IACM_MAP
 from charge.multiprocessor import MultiProcessor
 
 
+ChargeSet = Dict[int, Dict[str, List[float]]]
+"""A collection of possible charges, indexed by shell size and \
+        neighborhood canonical key.
+"""
+
+
 class Repository:
     """A collection of atom charges by neighborhood.
 
@@ -76,20 +82,12 @@ class Repository:
                 molids, data_location, extension, data_type)
 
         # process with iacm atom types
-        repo.charges_iacm = repo.__generate_charges(graphs)
+        repo.charges_iacm = repo.__generate_charges(graphs, 'iacm')
         canons = repo.__make_canons(graphs)
         repo.iso_iacm = repo.__make_isomorphics(molids, canons)
 
-        # convert to plain elements
-        for molid, graph in graphs:
-            for v, data in graph.nodes(data=True):
-                if data['atom_type'] not in IACM_MAP:
-                    print('Unknown atom_type {} in molid {}'.format(
-                        data['atom_type'], molid))
-                graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
-
         # process as plain elements
-        repo.charges_elem = repo.__generate_charges(graphs)
+        repo.charges_elem = repo.__generate_charges(graphs, 'atom_type')
         canons = repo.__make_canons(graphs)
         repo.iso_elem = repo.__make_isomorphics(molids, canons)
 
@@ -206,13 +204,14 @@ class Repository:
 
     def __generate_charges(
             self,
-            graphs: List[Tuple[int, nx.Graph]]
+            graphs: List[Tuple[int, nx.Graph]],
+            color_key: str
             ) -> Dict[int, Dict[str, List[float]]]:
         """Generate charges for all shell sizes and neighborhoods."""
         charges = defaultdict(lambda: defaultdict(list))
 
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            with MultiProcessor(_ChargeWorker, shell) as mp:
+            with MultiProcessor(_ChargeWorker, (shell, color_key)) as mp:
                 for c in mp.processed(graphs, 'shell %d' % shell):
                     for key, values in c.items():
                         charges[shell][key] += values
@@ -313,25 +312,26 @@ class _CanonicalizationWorker:
 
 class _ChargeWorker:
     """Collects charges per neighborhood from the given graph."""
-    def __init__(self, shell: int):
+    def __init__(self, shell: int, color_key: str):
         self.__shell = shell
+        self.__color_key = color_key
         self.__nauty = Nauty()
 
     def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
         charges = defaultdict(list)
 
         for key, partial_charge in _iter_atomic_fragments(
-                graph, self.__nauty, self.__shell):
+                graph, self.__nauty, self.__shell, self.__color_key):
             charges[key].append(partial_charge)
 
         return charges
 
 
-def _iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int):
+def _iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int, color_key: str):
     """Yields all atomic neighborhoods in the graph of the given shell size."""
     for atom in graph.nodes():
         if 'partial_charge' not in graph.node[atom]:
             raise KeyError(
                 'Missing property "partial_charge" for atom {}'.format(atom))
         partial_charge = float(graph.node[atom]['partial_charge'])
-        yield nauty.canonize_neighborhood(graph, atom, shell), partial_charge
+        yield nauty.canonize_neighborhood(graph, atom, shell, color_key), partial_charge

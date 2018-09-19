@@ -16,6 +16,12 @@ from charge.settings import REPO_LOCATION, IACM_MAP
 from charge.multiprocessor import MultiProcessor
 
 
+ChargeSet = Dict[int, Dict[str, List[float]]]
+"""A collection of possible charges, indexed by shell size and \
+        neighborhood canonical key.
+"""
+
+
 class Repository:
     """A collection of atom charges by neighborhood.
 

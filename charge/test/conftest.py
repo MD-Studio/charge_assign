@@ -1,3 +1,4 @@
+from collections import defaultdict
 import networkx as nx
 from pathlib import Path
 import pytest
@@ -37,6 +38,14 @@ def ref_graph(ref_graph_attributes, ref_graph_nodes, ref_graph_edges):
     graph = nx.Graph(**ref_graph_attributes)
     graph.add_nodes_from(ref_graph_nodes)
     graph.add_edges_from(ref_graph_edges)
+    return graph
+
+
+@pytest.fixture
+def plain_ref_graph(ref_graph):
+    graph = ref_graph.copy()
+    for _, data in graph.nodes(data=True):
+        del(data['iacm'])
     return graph
 
 
@@ -253,3 +262,140 @@ def ref_graph_nauty_output():
             '3 :  4;\n'
             '4 :  0 1 2 3;\n'
             'END')
+
+# Fixtures for testing charge assignment
+
+def dummy_charges():
+    return [0.314, 0.42, 0.2718]
+
+
+def dummy_charges2():
+    return [0.1, 0.2, 0.3]
+
+
+def dummy_charges3():
+    return [0.314, 0.314, 0.42, 0.2718]
+
+
+def dummy_charges4():
+    return [-0.516, 0.129]
+
+
+def dummy_charges5():
+    return [-0.516, -0.321]
+
+
+class ExtraDefaultDict(defaultdict):
+    def __contains__(self, member):
+        return True
+
+
+def dummy_chargeset():
+    return ExtraDefaultDict(dummy_charges)
+
+
+def dummy_chargeset2():
+    return {
+            'c18208da9e290c6faf8a0c58017d24d9': dummy_charges2()
+            }
+
+
+def dummy_chargeset3():
+    return ExtraDefaultDict(dummy_charges3)
+
+
+def dummy_chargeset4():
+    return ExtraDefaultDict(dummy_charges4)
+
+
+def dummy_chargeset5():
+    chargeset = ExtraDefaultDict(dummy_charges4)
+    chargeset['c18208da9e290c6faf8a0c58017d24d9'] = dummy_charges5()
+    return chargeset
+
+
+class MockRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset(),
+                1: dummy_chargeset(),
+                2: dummy_chargeset()
+                }
+
+        self.charges_elem = dict()
+
+
+class MockElemRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset2(),
+                1: dummy_chargeset2(),
+                2: dummy_chargeset2()
+                }
+
+        self.charges_elem = {
+                0: dummy_chargeset(),
+                1: dummy_chargeset(),
+                2: dummy_chargeset()
+                }
+
+
+class MockOrderRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset(),
+                1: dummy_chargeset(),
+                2: dummy_chargeset2()
+                }
+
+        self.charges_elem = {
+                0: dummy_chargeset(),
+                1: dummy_chargeset(),
+                2: dummy_chargeset()
+                }
+
+
+class MockMultichargeRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset3(),
+                1: dummy_chargeset3(),
+                2: dummy_chargeset3()
+                }
+
+        self.charges_elem = self.charges_iacm
+
+
+class MockMethaneRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset5(),
+                1: dummy_chargeset5(),
+                2: dummy_chargeset5()
+                }
+
+        self.charges_elem = self.charges_iacm
+
+
+@pytest.fixture
+def mock_repository():
+    return MockRepository()
+
+
+@pytest.fixture
+def mock_elem_repository():
+    return MockElemRepository()
+
+
+@pytest.fixture
+def mock_order_repository():
+    return MockOrderRepository()
+
+
+@pytest.fixture
+def mock_multicharge_repository():
+    return MockMultichargeRepository()
+
+@pytest.fixture
+def mock_methane_repository():
+    return MockMethaneRepository()

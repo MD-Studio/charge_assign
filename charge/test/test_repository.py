@@ -35,3 +35,5 @@ def test_create_from_dir(lgf_data_dir):
 
     assert len(repo.iso_iacm) == 2
     assert len(repo.iso_elem) == 2
+
+# TODO: test read and write

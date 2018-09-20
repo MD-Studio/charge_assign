@@ -4,7 +4,7 @@ import os
 import time
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 from zipfile import ZipFile, ZIP_DEFLATED
 
 import msgpack
@@ -13,6 +13,7 @@ import networkx as nx
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP
+from charge.types import Atom
 from charge.multiprocessor import MultiProcessor
 
 
@@ -20,6 +21,15 @@ ChargeSet = Dict[int, Dict[str, List[float]]]
 """A collection of possible charges, indexed by shell size and \
         neighborhood canonical key.
 """
+
+
+TraceableChargeSet = Dict[int, Dict[str, List[Tuple[float, int, Atom]]]]
+"""A collection of possible charges with the molid of the molecule \
+        they came from and the core atom of the neighborhood,
+"""
+
+
+EitherChargeSet = Union[ChargeSet, TraceableChargeSet]
 
 
 class Repository:
@@ -33,11 +43,15 @@ class Repository:
         charges_iacm: A dictionary, keyed by shell size, of \
                 dictionaries, keyed by neighborhood hash, of lists of \
                 charges (floats) for the atom at the center of the \
-                neighborhood. Atoms use IACM types.
+                neighborhood. Atoms use IACM types. Optionally, may \
+                contain tuples of (charge, molid, atom) if the \
+                repository is traceable.
         charges_elem: A dictionary, keyed by shell size, of \
                 dictionaries, keyed by neighborhood hash, of lists of \
                 charges (floats) for the atom at the center of the \
-                neighborhood. Atoms use plain elements.
+                neighborhood. Atoms use plain elements. Optionally, may \
+                contain tuples of (charge, molid, atom) if the \
+                repository is traceable.
     """
     def __init__(self,
                  min_shell: int=1,
@@ -47,8 +61,8 @@ class Repository:
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
 
-        self.charges_iacm = defaultdict(lambda: defaultdict(list))
-        self.charges_elem = defaultdict(lambda: defaultdict(list))
+        self.charges_iacm = defaultdict(lambda: defaultdict(list))  # type: EitherChargeSet
+        self.charges_elem = defaultdict(lambda: defaultdict(list))  # type: EitherChargeSet
         self.iso_iacm = defaultdict(list)
         self.iso_elem = defaultdict(list)
 
@@ -57,7 +71,9 @@ class Repository:
             data_location: str,
             data_type: IOType=IOType.LGF,
             min_shell: int=1,
-            max_shell: int=7) -> 'Repository':
+            max_shell: int=7,
+            traceable: bool=False
+            ) -> 'Repository':
 
         """Creates a new Repository from a directory of files.
 
@@ -82,12 +98,12 @@ class Repository:
                 molids, data_location, extension, data_type)
 
         # process with iacm atom types
-        repo.charges_iacm = repo.__generate_charges(graphs, 'iacm')
+        repo.charges_iacm = repo.__generate_charges(graphs, 'iacm', traceable)
         canons = repo.__make_canons(graphs)
         repo.iso_iacm = repo.__make_isomorphics(molids, canons)
 
         # process as plain elements
-        repo.charges_elem = repo.__generate_charges(graphs, 'atom_type')
+        repo.charges_elem = repo.__generate_charges(graphs, 'atom_type', traceable)
         canons = repo.__make_canons(graphs)
         repo.iso_elem = repo.__make_isomorphics(molids, canons)
 
@@ -205,13 +221,19 @@ class Repository:
     def __generate_charges(
             self,
             graphs: List[Tuple[int, nx.Graph]],
-            color_key: str
+            color_key: str,
+            traceable: bool=False
             ) -> Dict[int, Dict[str, List[float]]]:
         """Generate charges for all shell sizes and neighborhoods."""
         charges = defaultdict(lambda: defaultdict(list))
 
+        if traceable:
+            Worker = _TraceableChargeWorker
+        else:
+            Worker = _ChargeWorker
+
         for shell in range(self.__min_shell, self.__max_shell + 1):
-            with MultiProcessor(_ChargeWorker, (shell, color_key)) as mp:
+            with MultiProcessor(Worker, (shell, color_key)) as mp:
                 for c in mp.processed(graphs, 'shell %d' % shell):
                     for key, values in c.items():
                         charges[shell][key] += values
@@ -267,7 +289,7 @@ class Repository:
             with open(path, 'r') as f:
                 graph = convert_from(f.read(), data_type)
                 for shell in range(1, self.__max_shell + 1):
-                    for key, partial_charge in _iter_atomic_fragments(
+                    for key, partial_charge, _ in _iter_atomic_fragments(
                             graph, self.__nauty, shell):
                         callable_iacm(shell, key, partial_charge)
 
@@ -278,7 +300,7 @@ class Repository:
                 for v, data in graph.nodes(data=True):
                     graph.node[v]['atom_type'] = IACM_MAP[data['atom_type']]
                 for shell in range(1, self.__max_shell + 1):
-                    for key, partial_charge in _iter_atomic_fragments(
+                    for key, partial_charge, _ in _iter_atomic_fragments(
                             graph, self.__nauty, shell):
                         callable_elem(shell, key, partial_charge)
 
@@ -320,9 +342,26 @@ class _ChargeWorker:
     def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
         charges = defaultdict(list)
 
-        for key, partial_charge in _iter_atomic_fragments(
+        for key, partial_charge, _ in _iter_atomic_fragments(
                 graph, self.__nauty, self.__shell, self.__color_key):
             charges[key].append(partial_charge)
+
+        return charges
+
+
+class _TraceableChargeWorker:
+    """Collects charges per neighborhood from the given graph."""
+    def __init__(self, shell: int, color_key: str):
+        self.__shell = shell
+        self.__color_key = color_key
+        self.__nauty = Nauty()
+
+    def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
+        charges = defaultdict(list)
+
+        for key, partial_charge, atom in _iter_atomic_fragments(
+                graph, self.__nauty, self.__shell, self.__color_key):
+            charges[key].append((partial_charge, molid, atom))
 
         return charges
 
@@ -334,4 +373,4 @@ def _iter_atomic_fragments(graph: nx.Graph, nauty: Nauty, shell: int, color_key:
             raise KeyError(
                 'Missing property "partial_charge" for atom {}'.format(atom))
         partial_charge = float(graph.node[atom]['partial_charge'])
-        yield nauty.canonize_neighborhood(graph, atom, shell, color_key), partial_charge
+        yield nauty.canonize_neighborhood(graph, atom, shell, color_key), partial_charge, atom

@@ -49,6 +49,9 @@ class Nauty:
                 self.__process.wait(timeout=1)
         except ValueError:
             pass
+        except AttributeError:
+            # It seems that it's possible somehow for __process to not exist
+            pass
 
     def canonize_neighborhood(self, graph: nx.Graph, core: Any, shell: int, color_key='atom_type') -> str:
         """Calculate a canonical key for a neighborhood of an atom.

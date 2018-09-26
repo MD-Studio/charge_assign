@@ -13,7 +13,7 @@ import networkx as nx
 from charge.babel import convert_from, IOType
 from charge.nauty import Nauty
 from charge.settings import REPO_LOCATION, IACM_MAP
-from charge.types import Atom
+from charge.charge_types import Atom
 from charge.multiprocessor import MultiProcessor
 
 

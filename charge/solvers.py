@@ -10,7 +10,7 @@ from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, 
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
-from charge.types import Atom, ChargeList, WeightList
+from charge.charge_types import Atom, ChargeList, WeightList
 from charge.util import AssignmentError
 
 

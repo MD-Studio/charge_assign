@@ -1,3 +1,6 @@
+# Private ATB data used for cross-validation calculations
+scripts/cross_validation_data
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

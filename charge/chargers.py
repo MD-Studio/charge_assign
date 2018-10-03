@@ -66,7 +66,7 @@ class Charger(ABC):
             shells = sorted(self._repo.charges_iacm.keys(), reverse=True)
         elif isinstance(shell, int):
             shells = [shell]
-        elif isinstance(shell, Iterable[int]):
+        elif isinstance(shell, Iterable):
             shells = shell
         else:
             raise TypeError('shell must be int or List[int]')
@@ -75,6 +75,7 @@ class Charger(ABC):
             graph = util.iacmize(graph)
 
         values = self._collector.collect_values(graph, iacm_data_only or iacmize, shells, **kwargs)
+        print('values: {}'.format(values))
         self._solver.solve_partial_charges(graph, values, total_charge, **kwargs)
         self.__add_redistributed_charges(graph, total_charge)
 
@@ -248,3 +249,17 @@ class CDPCharger(Charger):
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
         self._solver = ILPSolver(rounding_digits, max_seconds)
+
+
+def make_charger(
+        name: str, repository: Repository, rounding_digits: int,
+        max_seconds: int, nauty: Optional[Nauty] = None) -> Charger:
+    if name == 'SimpleCharger':
+        return SimpleCharger(repository, rounding_digits, nauty)
+    if name == 'ILPCharger':
+        return ILPCharger(repository, rounding_digits, max_seconds, nauty)
+    if name == 'DPCharger':
+        return DPCharger(repository, rounding_digits, max_seconds, nauty)
+    if name == 'CDPCharger':
+        return CDPCharger(repository, rounding_digits, max_seconds, nauty)
+    raise ValueError('Invalid charger name {}'.format(name))

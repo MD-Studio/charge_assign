@@ -1,5 +1,6 @@
 from charge.chargers import CDPCharger, DPCharger, ILPCharger, SimpleCharger
 
+from math import log
 import networkx as nx
 import pytest
 
@@ -51,20 +52,20 @@ def test_ilp_charger(mock_methane_repository, ref_graph):
     charger.charge(ref_graph, 0)
 
     assert ref_graph.node[1]['partial_charge'] == pytest.approx(-0.52)
-    assert ref_graph.node[1]['score'] == 1.0
+    assert ref_graph.node[1]['score'] == pytest.approx(log(4))
     assert ref_graph.node[2]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[2]['score'] == 1.0
+    assert ref_graph.node[2]['score'] == pytest.approx(log(3))
     assert ref_graph.node[3]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[3]['score'] == 1.0
+    assert ref_graph.node[3]['score'] == pytest.approx(log(3))
     assert ref_graph.node[4]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[4]['score'] == 1.0
+    assert ref_graph.node[4]['score'] == pytest.approx(log(3))
     assert ref_graph.node[5]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[5]['score'] == 1.0
+    assert ref_graph.node[5]['score'] == pytest.approx(log(3))
 
     assert ref_graph.graph['time'] < 0.1
     assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
     assert ref_graph.graph['total_charge_redist'] == pytest.approx(0.0)
-    assert ref_graph.graph['score'] == pytest.approx(5.0)
+    assert ref_graph.graph['score'] == pytest.approx(4 * log(3) + log(4))
 
 
 def test_dp_charger(mock_methane_repository, ref_graph):
@@ -72,20 +73,20 @@ def test_dp_charger(mock_methane_repository, ref_graph):
     charger.charge(ref_graph, 0)
 
     assert ref_graph.node[1]['partial_charge'] == pytest.approx(-0.52)
-    assert ref_graph.node[1]['score'] == 1.0
+    assert ref_graph.node[1]['score'] == pytest.approx(log(4))
     assert ref_graph.node[2]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[2]['score'] == 1.0
+    assert ref_graph.node[2]['score'] == pytest.approx(log(3))
     assert ref_graph.node[3]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[3]['score'] == 1.0
+    assert ref_graph.node[3]['score'] == pytest.approx(log(3))
     assert ref_graph.node[4]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[4]['score'] == 1.0
+    assert ref_graph.node[4]['score'] == pytest.approx(log(3))
     assert ref_graph.node[5]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[5]['score'] == 1.0
+    assert ref_graph.node[5]['score'] == pytest.approx(log(3))
 
     assert ref_graph.graph['time'] < 0.1
     assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
     assert ref_graph.graph['total_charge_redist'] == pytest.approx(0.0)
-    assert ref_graph.graph['score'] == pytest.approx(5.0)
+    assert ref_graph.graph['score'] == pytest.approx(4 * log(3) + log(4))
 
 
 def test_cdp_charger(mock_methane_repository, ref_graph):
@@ -93,17 +94,17 @@ def test_cdp_charger(mock_methane_repository, ref_graph):
     charger.charge(ref_graph, 0)
 
     assert ref_graph.node[1]['partial_charge'] == pytest.approx(-0.52)
-    assert ref_graph.node[1]['score'] == 1.0
+    assert ref_graph.node[1]['score'] == pytest.approx(log(4))
     assert ref_graph.node[2]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[2]['score'] == 1.0
+    assert ref_graph.node[2]['score'] == pytest.approx(log(3))
     assert ref_graph.node[3]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[3]['score'] == 1.0
+    assert ref_graph.node[3]['score'] == pytest.approx(log(3))
     assert ref_graph.node[4]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[4]['score'] == 1.0
+    assert ref_graph.node[4]['score'] == pytest.approx(log(3))
     assert ref_graph.node[5]['partial_charge'] == pytest.approx(0.13)
-    assert ref_graph.node[5]['score'] == 1.0
+    assert ref_graph.node[5]['score'] == pytest.approx(log(3))
 
     assert ref_graph.graph['time'] < 0.1
     assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
     assert ref_graph.graph['total_charge_redist'] == pytest.approx(0.0)
-    assert ref_graph.graph['score'] == pytest.approx(5.0)
+    assert ref_graph.graph['score'] == pytest.approx(4 * log(3) + log(4))

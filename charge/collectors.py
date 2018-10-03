@@ -1,5 +1,5 @@
 from abc import ABC
-from math import ceil
+from math import ceil, log
 from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
@@ -227,6 +227,7 @@ class HistogramCollector(Collector):
                     charges and their weights. The list will be empty \
                     if no charge is found.
         """
+        score_hist = self.__score_histogram_log
         histograms = dict()
         no_vals = list()
 
@@ -240,16 +241,17 @@ class HistogramCollector(Collector):
                             color_key='iacm' if 'iacm' in graph.node[atom] else 'atom_type')
                     if key in self.__repository.charges_iacm[shell]:
                         charges = self.__repository.charges_iacm[shell][key]
-                        histograms[atom] = self.__calculate_histogram(
-                                charges, max_bins)
+                        hist = self.__calculate_histogram(charges, max_bins)
+                        histograms[atom] = score_hist(hist, np.mean(charges))
                         break
-                elif not iacm_data_only:
+
+                if not iacm_data_only:
                     if shell in self.__repository.charges_elem:
                         key = self.__nauty.canonize_neighborhood(graph, atom, shell)
                         if key in self.__repository.charges_elem[shell]:
                             charges = self.__repository.charges_elem[shell][key]
-                            histograms[atom] = self.__calculate_histogram(
-                                    charges, max_bins)
+                            hist = self.__calculate_histogram(charges, max_bins)
+                            histograms[atom] = score_hist(hist, np.mean(charges))
                             break
             else:
                 no_vals.append(atom)
@@ -281,6 +283,10 @@ class HistogramCollector(Collector):
             - Their widths are n-significant-digit numbers,
                 according to self.__rounding_digits
             - There are at most max_bins non-zero bins
+            - The middle bin center is on the median charge, rounded to
+                an n-significant digit number.
+            - The bin size is as close to the size chosen by the Freedman-
+                Diaconis rule as it can be, given the above constraints.
 
         Only non-empty bins will be returned.
 
@@ -288,23 +294,68 @@ class HistogramCollector(Collector):
             charges: A list of charges to process into a histogram
             max_bins: The maximum number of bins the histogram should have
         """
-        def round_to(x, grain, up):
-            # rounds to nearest int, with 0.5 rounded down
+        def round_to(x, grain):
+            # rounds to nearest multiple of grain, with 0.5 rounded down
             return ceil((x / grain) - 0.5) * grain
 
+        def median(values: List[float]):
+            n = len(values)
+            h = n // 2
+            if n % 2 == 0:
+                return sum(values[h-1:h+1]) / 2.0
+            else:
+                return values[h]
+
+        # numpy.percentile isn't quite as accurate for small lists
+        def first_quartile(values: List[float]):
+            n = len(values)
+            if n == 1:
+                return values[0]
+            if n % 2 == 0:
+                return median(values[0:n // 2])
+            q = n // 4
+            if n % 4 == 1:
+                return 0.75 * values[q-1] + 0.25 * values[q]
+            if n % 4 == 3:
+                return 0.75 * values[q] + 0.25 * values[q+1]
+
+        def third_quartile(values: List[float]):
+            n = len(values)
+            if n == 1:
+                return values[0]
+            if n % 2 == 0:
+                return median(values[n // 2:])
+            q = n // 4
+            if n % 4 == 1:
+                return 0.25 * values[3 * q] + 0.75 * values[3 * q + 1]
+            if n % 4 == 3:
+                return 0.25 * values[3 * q + 1] + 0.75 * values[3 * q + 2]
+
+
         grain = 10**(-self.__rounding_digits)
-        print(charges, max_bins, grain)
-        spacing = 0
+
+        # calc F-D width
+        iqr = third_quartile(charges) - first_quartile(charges)
+        fd_width = 2.0 * iqr / (len(charges)**(1./3))
+        if fd_width == 0.0:
+            fd_width = grain
+
+        median_charge = round_to(median(charges), grain)
+
+        # subtract one because we start the loop with an increment
+        spacing = round_to(fd_width, grain) / grain
         num_bins = max_bins + 1
         while num_bins > max_bins:
-            spacing += 1
             step = grain * spacing
 
-            min_charge_bin = round_to(min(charges), step, False)
-            max_charge_bin = round_to(max(charges), step, True)
+            # align center bin to median and find edge bin centers
+            min_charge_bin = (median_charge -
+                    round_to(median_charge - min(charges), step))
+            max_charge_bin = (median_charge +
+                    round_to(max(charges) - median_charge, step))
+
             # add half a step to include the last value
             bin_centers = np.arange(min_charge_bin, max_charge_bin + 0.5*step, step)
-            print(bin_centers)
 
             min_bin_edge = min_charge_bin - 0.5*step
             max_bin_edge = max_charge_bin + 0.5*step
@@ -312,17 +363,31 @@ class HistogramCollector(Collector):
             bin_edges = np.arange(min_bin_edge, max_bin_edge + 0.5*step, step)
             # extend a bit to compensate for round-off error
             bin_edges[-1] += 1e-15
-            print(bin_edges)
 
             counts, _ = np.histogram(charges, bins=bin_edges)
             num_bins = np.count_nonzero(counts)
-            print(counts)
-            print(num_bins)
+            spacing += 1
 
         nonzero_bins = np.nonzero(counts)
         counts = list(counts[nonzero_bins])
         bin_centers = list(bin_centers[nonzero_bins])
-        print(bin_centers, counts)
-        print()
 
         return bin_centers, counts
+
+    def __score_histogram_count(self, histogram: Tuple[ChargeList, WeightList],
+            mean: float) -> Tuple[ChargeList, WeightList]:
+        return histogram
+
+    def __score_histogram_log(self, histogram: Tuple[ChargeList, WeightList],
+            mean: float) -> Tuple[ChargeList, WeightList]:
+        bin_centers, counts = histogram
+        scores = list(map(log, counts))
+        return bin_centers, scores
+
+    def __score_histogram_martin(self, histogram: Tuple[ChargeList, WeightList],
+            mean: float) -> Tuple[ChargeList, WeightList]:
+        bin_centers, counts = histogram
+        scores = []
+        for count, center in zip(counts, bin_centers):
+            scores.append(count / (1.0 + (center - mean)**2))
+        return bin_centers, scores

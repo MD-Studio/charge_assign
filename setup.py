@@ -25,7 +25,8 @@ setup(
             'dev': [
                 'pytest',
                 'pytest-pep8',
-                'pytest-cov'
+                'pytest-cov',
+                'pytest-xdist'
             ]
         },
         keywords = ['Molecules', 'Charges', 'Force field', 'Graph theory'],

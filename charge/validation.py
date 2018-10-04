@@ -1,5 +1,6 @@
 from collections import MutableMapping
 import copy
+import json
 import math
 import os
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
@@ -55,24 +56,15 @@ def cross_validate_methods(
     return mean_abs_err, mean_sq_err
 
 
-class ValidationReport:
+class AtomReport:
     def __init__(self) -> None:
         self.total_atoms = 0
         """Total number of atoms these statistics are calculated over"""
-        self.total_mols = 0
-        """Total number of molecules charges were estimated for"""
         self.sum_abs_atom_err = 0.0
         """Mean absolute per-atom charge error"""
         self.sum_sq_atom_err = 0.0
         """Mean squared per-atom charge error"""
-        self.sum_abs_total_err = 0.0
-        """Mean absolute total charge error"""
-        self.sum_sq_total_err = 0.0
-        """Mean squared total charge error"""
-        self.solver_stats = []
-        """List of solver statistics (time, items, scaled_cap)"""
 
-    # methods for reading results
     def mean_abs_atom_err(self):
         return self.sum_abs_atom_err / self.total_atoms
 
@@ -81,6 +73,42 @@ class ValidationReport:
 
     def rms_atom_err(self):
         return math.sqrt(self.mean_sq_atom_err())
+
+    def add_atom_error(self, err: float) -> None:
+        self.total_atoms += 1
+        self.sum_abs_atom_err += abs(err)
+        self.sum_sq_atom_err += err * err
+
+    def __iadd__(self, other_report: 'AtomReport') -> 'AtomReport':
+        self.total_atoms += other_report.total_atoms
+        self.sum_abs_atom_err += other_report.sum_abs_atom_err
+        self.sum_sq_atom_err += other_report.sum_sq_atom_err
+        return self
+
+    def __add__(self, other_report: 'AtomReport') -> 'AtomReport':
+        new_report = copy.deepcopy(self)
+        new_report += other_report
+        return new_report
+
+    def as_dict(self) -> Dict[str, Union[float, int]]:
+        return {
+                'total_atoms': self.total_atoms,
+                'sum_abs_atom_err': self.sum_abs_atom_err,
+                'sum_sq_atom_err': self.sum_sq_atom_err}
+
+
+class MoleculeReport:
+    def __init__(self) -> None:
+        self.total_mols = 0
+        """Total number of molecules charges were estimated for"""
+        self.sum_abs_total_err = 0.0
+        """Mean absolute total charge error"""
+        self.sum_sq_total_err = 0.0
+        """Mean squared total charge error"""
+        self.solver_stats = []
+        """List of solver statistics (time, items, scaled_cap)"""
+
+    # methods for reading results
 
     def mean_abs_total_err(self):
         return self.sum_abs_total_err / self.total_mols
@@ -96,30 +124,72 @@ class ValidationReport:
 
     # methods for adding results
 
-    def add_atom_error(self, err: float) -> None:
-        self.total_atoms += 1
-        self.sum_abs_atom_err += abs(err)
-        self.sum_sq_atom_err += err * err
-
     def add_total_charge_error(self, err: float) -> None:
         self.total_mols += 1
         self.sum_abs_total_err += abs(err)
         self.sum_sq_total_err += err * err
 
-    def __iadd__(self, other_report: 'ValidationReport') -> None:
-        self.total_atoms += other_report.total_atoms
+    def __iadd__(self, other_report: 'MoleculeReport') -> 'MoleculeReport':
         self.total_mols += other_report.total_mols
-        self.sum_abs_atom_err += other_report.sum_abs_atom_err
-        self.sum_sq_atom_err += other_report.sum_sq_atom_err
         self.sum_abs_total_err += other_report.sum_abs_total_err
         self.sum_sq_total_err += other_report.sum_sq_total_err
         self.solver_stats.extend(other_report.solver_stats)
         return self
 
-    def __add__(self, other_report: 'ValidationReport') -> 'ValidationReport':
+    def __add__(self, other_report: 'MoleculeReport') -> 'MoleculeReport':
         new_report = copy.deepcopy(self)
         new_report += other_report
         return new_report
+
+    def as_dict(self) -> Dict[str, Union[float, int]]:
+        return {
+                'total_mols': self.total_mols,
+                'sum_abs_total_err': self.sum_abs_total_err,
+                'sub_sq_total_err': self.sum_sq_total_err,
+                'solver_stats': self.solver_stats}
+
+
+class ValidationReport:
+    def __init__(self) -> None:
+        self.__atom_reports = {
+                'C': AtomReport(),
+                'H': AtomReport(),
+                'N': AtomReport(),
+                'O': AtomReport(),
+                'P': AtomReport(),
+                'S': AtomReport(),
+                'Other': AtomReport()
+                }
+        self.molecule = MoleculeReport()
+
+    def category(self, element: str):
+        elem_to_cat = {
+                'C': 'C', 'H': 'H', 'N': 'N', 'O': 'O', 'P': 'P', 'S': 'S'}
+        category = elem_to_cat.get(element, 'Other')
+        return self.__atom_reports[category]
+
+    def __iadd__(self, other_report: 'ValidationReport') -> 'ValidationReport':
+        for key in self.__atom_reports:
+            self.__atom_reports[key] += other_report.__atom_reports[key]
+        self.molecule += other_report.molecule
+        return self
+
+    def __add__(self, other_report: 'MoleculeReport') -> 'MoleculeReport':
+        new_report = copy.deepcopy(self)
+        new_report += other_report
+        return new_report
+
+    def as_json(self) -> str:
+        return json.dumps({
+            'per_atom': {
+                'C': self.__atom_reports['C'].as_dict(),
+                'H': self.__atom_reports['H'].as_dict(),
+                'N': self.__atom_reports['N'].as_dict(),
+                'O': self.__atom_reports['O'].as_dict(),
+                'P': self.__atom_reports['P'].as_dict(),
+                'S': self.__atom_reports['S'].as_dict(),
+                'Other': self.__atom_reports['Other'].as_dict()},
+            'per_molecule': self.molecule.as_dict()})
 
 
 def cross_validate_molecules(
@@ -128,7 +198,9 @@ def cross_validate_molecules(
         data_location: str,
         data_type: IOType = IOType.LGF,
         shell: Union[None, int, Iterable[int]] = None,
-        repo: Optional[Repository] = None
+        repo: Optional[Repository] = None,
+        bucket: int = 0,
+        num_buckets: int = 1
         ) -> ValidationReport:
     """Cross-validates a particular method on the given molecule data.
 
@@ -146,6 +218,9 @@ def cross_validate_molecules(
     repository, and if no matches are found, its plain elements are \
     matched against the plain element side.
 
+    If bucket and num_buckets are specified, then this will only run \
+    the cross-validation if (molid % num_buckets) == bucket.
+
     Args:
         charger_type: Name of a Charger-derived class implementing an \
                 assignment method.
@@ -154,9 +229,13 @@ def cross_validate_molecules(
         data_type: Format of the molecule data to expect.
         shell: (List of) shell size(s) to use.
         repo: A Repository with traceable charges.
+        bucket: Cross-validate for this bucket.
+        num_buckets: Total number of buckets that will run.
 
     Returns:
-        A ValidationReport, see that class.
+        A dict containing AtomReports per element category, and a
+        MoleculeReport. Keyed by category name, and 'Molecule' for
+        the per-molecule statistics.
     """
     if shell is None:
         min_shell, max_shell = None, None
@@ -196,20 +275,22 @@ def cross_validate_molecules(
     report = ValidationReport()
 
     for molid in molids:
-        #print('molid: {}'.format(molid))
+        if (molid % num_buckets) == bucket:
+            #print('molid: {}'.format(molid))
 
-        mol_path = os.path.join(data_location, '{}{}'.format(molid, extension))
-        with open(mol_path, 'r') as f:
-            graph = convert_from(f.read(), data_type)
+            mol_path = os.path.join(data_location, '{}{}'.format(molid, extension))
+            with open(mol_path, 'r') as f:
+                graph = convert_from(f.read(), data_type)
 
-        report += cross_validate_molecule(repo, molid, graph, charger_type, shells, iacm, nauty)
+            report += cross_validate_molecule(repo, molid, graph, charger_type, shells, iacm, nauty)
 
     return report
 
 
 def cross_validate_molecule(
         repository: Repository, molid: int, graph: nx.Graph, charger_type: str,
-        shells: List[int], iacm: bool, nauty: Nauty) -> ValidationReport:
+        shells: List[int], iacm: bool, nauty: Nauty
+        ) -> ValidationReport:
     """Test prediction for a single molecule.
 
     Args:
@@ -222,7 +303,8 @@ def cross_validate_molecule(
         nauty: Nauty instance to use for canonization
 
     Returns:
-        A ValidationReport with the comparison results
+        A dict of ValidationReports, keyed by element category, with
+        the comparison results
     """
     report = ValidationReport()
 
@@ -239,12 +321,16 @@ def cross_validate_molecule(
         warn(msg.format(molid, shells, e))
         return report
 
-    for atom, ref_charge in graph.nodes(data='partial_charge'):
-        report.add_atom_error(test_graph.node[atom]['partial_charge'] - ref_charge)
+    for atom, data in graph.nodes(data=True):
+        ref_charge = data['partial_charge']
+        element = data['atom_type']
+        report.category(element).add_atom_error(
+                test_graph.node[atom]['partial_charge'] - ref_charge)
 
-    report.add_total_charge_error(test_graph.graph['total_charge'] - total_charge)
+    report.molecule.add_total_charge_error(
+            test_graph.graph['total_charge'] - total_charge)
 
-    report.solver_stats.append((
+    report.molecule.solver_stats.append((
             test_graph.graph['time'],
             test_graph.graph['items'],
             test_graph.graph['scaled_capacity']))

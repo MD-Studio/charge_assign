@@ -20,6 +20,7 @@ def print_report(charger, iacm, shell, report, num_warnings):
         print('mae: {}'.format(atom_rep.mean_abs_atom_err()))
         print('mse: {}, rmse: {}'.format(atom_rep.mean_sq_atom_err(), atom_rep.rms_atom_err()))
 
+    print('stats: {}'.format(report.molecule.solver_stats))
 
 def cross_validate(charger, iacm, shell, test_data_dir, repo, bucket, num_buckets) -> None:
     num_warnings = 0
@@ -52,10 +53,9 @@ if __name__ == '__main__':
     repo_file = 'cross_validation_repository.zip'
     repo = Repository.read(repo_file)
 
-    cross_validate('SimpleCharger', False, 1, test_data_dir, repo, bucket, num_buckets)
-    #cross_validate('ILPCharger', False, 1, test_data_dir)
-    #cross_validate('ILPCharger', True, 1, test_data_dir)
-    #cross_validate('ILPCharger', False, 2, test_data_dir, repo, bucket, num_buckets)
-    #cross_validate('ILPCharger', False, 2, test_data_dir, repo, 1, 2)
-    #cross_validate('ILPCharger', True, 2, test_data_dir)
-    #cross_validate('CDPCharger', True, 1, test_data_dir)
+    cross_validate('SimpleCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('SimpleCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('ILPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('ILPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('CDPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('CDPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)

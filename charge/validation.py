@@ -120,7 +120,7 @@ class MoleculeReport:
         return math.sqrt(self.mean_sq_total_err())
 
     def mean_time(self):
-        return sum([time for time, _, _ in self.solver_stats]) / self.total_mols
+        return sum([time for _, _, time, _, _ in self.solver_stats]) / self.total_mols
 
     # methods for adding results
 
@@ -321,16 +321,20 @@ def cross_validate_molecule(
         warn(msg.format(molid, shells, e))
         return report
 
+    atoms_in_this_mol_report = AtomReport()
     for atom, data in graph.nodes(data=True):
         ref_charge = data['partial_charge']
         element = data['atom_type']
-        report.category(element).add_atom_error(
-                test_graph.node[atom]['partial_charge'] - ref_charge)
+        atom_error = test_graph.node[atom]['partial_charge'] - ref_charge
+        report.category(element).add_atom_error(atom_error)
+        atoms_in_this_mol_report.add_atom_error(atom_error)
 
     report.molecule.add_total_charge_error(
             test_graph.graph['total_charge'] - total_charge)
 
     report.molecule.solver_stats.append((
+            molid,
+            atoms_in_this_mol_report.mean_abs_atom_err(),
             test_graph.graph['time'],
             test_graph.graph['items'],
             test_graph.graph['scaled_capacity']))

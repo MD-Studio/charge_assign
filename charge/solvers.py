@@ -1,5 +1,5 @@
-from abc import ABC
 import itertools
+from abc import ABC
 from time import perf_counter
 from typing import Dict, Tuple
 
@@ -7,10 +7,8 @@ import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
-from charge.nauty import Nauty
-from charge.repository import Repository
+from charge.charge_types import Atom, ChargeList, WeightList
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
-from charge.types import Atom, ChargeList, WeightList
 from charge.util import AssignmentError
 
 

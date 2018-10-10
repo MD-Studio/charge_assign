@@ -1,18 +1,18 @@
-from collections import MutableMapping
 import copy
 import json
 import math
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from collections import MutableMapping
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from warnings import warn
 
 import networkx as nx
 
 from charge.babel import convert_from, IOType
-from charge.chargers import Charger, make_charger
+from charge.charge_types import Atom
+from charge.chargers import make_charger
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.types import Atom
 from charge.util import AssignmentError
 
 

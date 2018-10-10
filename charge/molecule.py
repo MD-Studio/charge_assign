@@ -2,7 +2,7 @@ import networkx as nx
 from typing import Generator, Tuple
 
 from charge.nauty import  Nauty
-from charge.types import Atom
+from charge.charge_types import Atom
 
 
 def atoms_neighborhoods_charges(

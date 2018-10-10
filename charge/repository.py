@@ -1,22 +1,18 @@
-import bisect
-import math
 import os
-import time
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable, Dict, List, Tuple, Union
-from zipfile import ZipFile, ZIP_DEFLATED
+from typing import Dict, List, Tuple, Union
+from zipfile import ZipFile
 
 import msgpack
 import networkx as nx
 
 from charge.babel import convert_from, IOType
-from charge.nauty import Nauty
-from charge.settings import REPO_LOCATION, IACM_MAP
-from charge.types import Atom
+from charge.charge_types import Atom
 from charge.molecule import atoms_neighborhoods_charges
 from charge.multiprocessor import MultiProcessor
-
+from charge.nauty import Nauty
+from charge.settings import REPO_LOCATION
 
 ChargeSet = Dict[int, Dict[str, List[float]]]
 """A collection of possible charges, indexed by shell size and \

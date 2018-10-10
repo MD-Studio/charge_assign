@@ -330,26 +330,22 @@ def make_charger(
         nauty: Optional[Nauty] = None,
         scoring: Optional[MethodType] = None,
         max_bins: Optional[int] = MAX_BINS) -> Charger:
+    # get function parameter names and values:
+    # since we did not declare any new variables yet, this equals the local variables
+    local_vars = locals().copy()
     # get all classes in this module
     clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+
     for cls_name, cls in clsmembers:
         # find class with the matching name
         if cls_name == name:
             parameters = []
             # match cls.__init__() parameters to make_charger() parameters
             for param_name in inspect.signature(cls).parameters:
-                if param_name == 'repository':
-                    parameters.append(repository)
-                elif param_name == 'rounding_digits':
-                    parameters.append(rounding_digits)
-                elif param_name == 'max_seconds':
-                    parameters.append(max_seconds)
-                elif param_name == 'nauty':
-                    parameters.append(nauty)
-                elif param_name == 'scoring':
-                    parameters.append(scoring)
-                elif param_name == 'max_bins':
-                    parameters.append(max_bins)
+                if param_name in local_vars:
+                    parameters.append(local_vars[param_name])
             # return instance of cls
             return cls(*parameters)
+
+    # class not found
     raise ValueError('Invalid charger name {}'.format(name))

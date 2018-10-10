@@ -10,7 +10,7 @@ from charge import util
 from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS
+from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS
 from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
 
 
@@ -226,7 +226,8 @@ class ILPCharger(Charger):
             rounding_digits: int,
             max_seconds: int,
             nauty: Optional[Nauty]=None,
-            scoring: Optional[MethodType]=None
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int] = MAX_BINS
             ) -> None:
         """Create an ILPCharger.
 
@@ -247,7 +248,7 @@ class ILPCharger(Charger):
              :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         self._solver = ILPSolver(rounding_digits, max_seconds)
 
 
@@ -263,7 +264,8 @@ class DPCharger(Charger):
             repository: Repository,
             rounding_digits: int,
             nauty: Optional[Nauty]=None,
-            scoring: Optional[MethodType]=None
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int] = MAX_BINS
             ) -> None:
         """Create an DPCharger.
 
@@ -281,7 +283,7 @@ class DPCharger(Charger):
              :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         self._solver = DPSolver(rounding_digits)
 
 
@@ -297,7 +299,8 @@ class CDPCharger(Charger):
             repository: Repository,
             rounding_digits: int,
             nauty: Optional[Nauty]=None,
-            scoring: Optional[MethodType]=None
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int] = MAX_BINS
             ) -> None:
         """Create a CDPCharger.
 
@@ -315,13 +318,18 @@ class CDPCharger(Charger):
              :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         self._solver = CDPSolver(rounding_digits)
 
 
 def make_charger(
-        name: str, repository: Repository, rounding_digits: int,
-        max_seconds: int, nauty: Optional[Nauty] = None, scoring: Optional[MethodType] = None) -> Charger:
+        name: str,
+        repository: Repository,
+        rounding_digits: int,
+        max_seconds: int,
+        nauty: Optional[Nauty] = None,
+        scoring: Optional[MethodType] = None,
+        max_bins: Optional[int] = 0) -> Charger:
     # get all classes in this module
     clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     for cls_name, cls in clsmembers:
@@ -340,6 +348,8 @@ def make_charger(
                     parameters.append(nauty)
                 elif param_name == 'scoring':
                     parameters.append(scoring)
+                elif param_name == 'max_bins':
+                    parameters.append(max_bins)
             # return instance of cls
             return cls(*parameters)
     raise ValueError('Invalid charger name {}'.format(name))

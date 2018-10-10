@@ -28,8 +28,7 @@ class Collector(ABC):
             self,
             graph: nx.Graph,
             iacm_data_only: bool,
-            shells: List[int],
-            **kwargs: Any
+            shells: List[int]
             ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
         """Collect charges for a graph's atoms.
 
@@ -86,8 +85,7 @@ class SimpleCollector(Collector, metaclass=ABCMeta):
             self,
             graph: nx.Graph,
             iacm_data_only: bool,
-            shells: List[int],
-            **kwargs: Any
+            shells: List[int]
             ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
         """Collect charges for a graph's atoms from a Repository.
 
@@ -273,19 +271,20 @@ class HistogramCollector(Collector):
             repository: Repository,
             rounding_digits: int,
             nauty: Optional[Nauty]=None,
-            scoring: Optional[MethodType]=None
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int]=MAX_BINS
             ) -> None:
         self.__repository = repository
         self.__rounding_digits = rounding_digits
         self.__nauty = nauty if nauty is not None else Nauty()
         self.__score_hist = scoring if scoring else self.score_histogram_log
+        self.max_bins = max(max_bins, 1)
 
     def collect_values(
             self,
             graph: nx.Graph,
             iacm_data_only: bool,
-            shells: List[int],
-            **kwargs: Any
+            shells: List[int]
             ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
         """Collect charges for a graph's atoms from a Repository.
 
@@ -323,8 +322,6 @@ class HistogramCollector(Collector):
         histograms = dict()
         no_vals = list()
 
-        max_bins = max(int(kwargs['max_bins']), 1) if 'max_bins' in kwargs else MAX_BINS
-
         for atom in graph.nodes():
             for shell in shells:
                 if shell in self.__repository.charges_iacm:
@@ -333,7 +330,7 @@ class HistogramCollector(Collector):
                             color_key='iacm' if 'iacm' in graph.node[atom] else 'atom_type')
                     if key in self.__repository.charges_iacm[shell]:
                         charges = self.__repository.charges_iacm[shell][key]
-                        hist = self._calculate_histogram(charges, max_bins)
+                        hist = self._calculate_histogram(charges, self.max_bins)
                         histograms[atom] = self.__score_hist(hist, float(np.mean(charges)))
                         break
 
@@ -342,7 +339,7 @@ class HistogramCollector(Collector):
                         key = self.__nauty.canonize_neighborhood(graph, atom, shell)
                         if key in self.__repository.charges_elem[shell]:
                             charges = self.__repository.charges_elem[shell][key]
-                            hist = self._calculate_histogram(charges, max_bins)
+                            hist = self._calculate_histogram(charges, self.max_bins)
                             histograms[atom] = self.__score_hist(hist, float(np.mean(charges)))
                             break
             else:
@@ -482,18 +479,17 @@ class HistogramCollector(Collector):
 class ModeCollector(HistogramCollector):
     """A collector that returns the mode of the histogram of all charges found.
 
-        For each atom, this collector collects possible charges, then it \
-        creates a histogram, with each bin becoming a kind of meta-charge \
-        in a coarse-grained version of the original list. It returns the \
-        the mode of these meta-charges. If the histogram is multimodal,
-        it returns the mode closest to the median of all possible charges.
+    For each atom, this collector collects possible charges, then it \
+    creates a histogram, with each bin becoming a kind of meta-charge \
+    in a coarse-grained version of the original list. It returns the \
+    the mode of these meta-charges. If the histogram is multimodal,
+    it returns the mode closest to the median of all possible charges.
 
-        Args:
-            repository: The Repository to collect charges from.
-            rounding_digits: The number of decimals to round charges to.
-            nauty: An external Nauty instance to use
-        """
-
+    Args:
+        repository: The Repository to collect charges from.
+        rounding_digits: The number of decimals to round charges to.
+        nauty: An external Nauty instance to use
+    """
     def __init__(
             self,
             repository: Repository,

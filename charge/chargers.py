@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Iterable, Optional, Union
 
 import networkx as nx
@@ -18,6 +18,7 @@ class Charger(ABC):
     _solver member variables to the desired objects in your derived \
     class.
     """
+    @abstractmethod
     def __init__(self,
                  repository: Repository,
                  rounding_digits: int = ROUNDING_DIGITS,

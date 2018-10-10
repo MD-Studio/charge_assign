@@ -1,14 +1,14 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from math import ceil, log
 from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
 
-from charge.util import AssignmentError
-from charge.settings import MAX_BINS
 from charge.nauty import Nauty
 from charge.repository import ChargeSet, Repository
+from charge.settings import MAX_BINS
+from charge.util import AssignmentError
 
 Atom = Any  # TODO: define this for the whole library
 ChargeList = List[float]
@@ -22,6 +22,7 @@ class Collector(ABC):
     in a molecule graph, and return a histogram describing the \
     distribution of the obtained charges for each atom.
     """
+    @abstractmethod
     def collect_values(
             self,
             graph: nx.Graph,
@@ -49,7 +50,7 @@ class Collector(ABC):
                     lists, the first with charges, the second with \
                     weights.
         """
-        raise NotImplemented()
+        pass
 
 
 class MeanCollector(Collector):

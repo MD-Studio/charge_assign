@@ -1,5 +1,5 @@
 import itertools
-from abc import ABC
+from abc import ABC, abstractmethod
 from time import perf_counter
 from typing import Dict, Tuple
 
@@ -18,6 +18,7 @@ class Solver(ABC):
     Solvers assign charges to atoms based on charge distribution \
     histograms obtained by a Collector.
     """
+    @abstractmethod
     def solve_partial_charges(
             self,
             graph: nx.Graph,
@@ -38,7 +39,7 @@ class Solver(ABC):
                     by a Collector.
             total_charge: The total charge of the molecule.
         """
-        raise NotImplemented()
+        pass
 
 
 class SimpleSolver(Solver):

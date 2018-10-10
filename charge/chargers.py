@@ -1,6 +1,5 @@
 from abc import ABC
-import warnings
-from typing import Dict, Iterable, Optional, Union
+from typing import Iterable, Optional, Union
 
 import networkx as nx
 
@@ -195,7 +194,6 @@ class DPCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            max_seconds: int,
             nauty: Optional[Nauty]=None
             ) -> None:
         """Create an DPCharger.
@@ -207,14 +205,11 @@ class DPCharger(Charger):
         Args:
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
-            max_seconds: A limit for the run time. If no solution is \
-                    found within this limit, an exception will be \
-                    raised.
             nauty: An external Nauty instance to use
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
-        self._solver = ILPSolver(rounding_digits, max_seconds)
+        self._solver = DPSolver(rounding_digits)
 
 
 class CDPCharger(Charger):
@@ -228,10 +223,9 @@ class CDPCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            max_seconds: int,
             nauty: Optional[Nauty]=None
             ) -> None:
-        """Create a DPCharger.
+        """Create a CDPCharger.
 
         Nauty instances manage an external process, so they're \
         somewhat expensive to create. If you have multiple chargers, \
@@ -240,14 +234,11 @@ class CDPCharger(Charger):
         Args:
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
-            max_seconds: A limit for the run time. If no solution is \
-                    found within this limit, an exception will be \
-                    raised.
             nauty: An external Nauty instance to use
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
-        self._solver = ILPSolver(rounding_digits, max_seconds)
+        self._solver = CDPSolver(rounding_digits)
 
 
 def make_charger(
@@ -258,7 +249,7 @@ def make_charger(
     if name == 'ILPCharger':
         return ILPCharger(repository, rounding_digits, max_seconds, nauty)
     if name == 'DPCharger':
-        return DPCharger(repository, rounding_digits, max_seconds, nauty)
+        return DPCharger(repository, rounding_digits, nauty)
     if name == 'CDPCharger':
-        return CDPCharger(repository, rounding_digits, max_seconds, nauty)
+        return CDPCharger(repository, rounding_digits, nauty)
     raise ValueError('Invalid charger name {}'.format(name))

@@ -1,3 +1,5 @@
+import inspect
+import sys
 from abc import ABC, abstractmethod
 from typing import Iterable, Optional, Union
 
@@ -245,12 +247,22 @@ class CDPCharger(Charger):
 def make_charger(
         name: str, repository: Repository, rounding_digits: int,
         max_seconds: int, nauty: Optional[Nauty] = None) -> Charger:
-    if name == 'SimpleCharger':
-        return SimpleCharger(repository, rounding_digits, nauty)
-    if name == 'ILPCharger':
-        return ILPCharger(repository, rounding_digits, max_seconds, nauty)
-    if name == 'DPCharger':
-        return DPCharger(repository, rounding_digits, nauty)
-    if name == 'CDPCharger':
-        return CDPCharger(repository, rounding_digits, nauty)
+    # get all classes in this module
+    clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+    for cls_name, cls in clsmembers:
+        # find class with the matching name
+        if cls_name == name:
+            parameters = []
+            # match cls.__init__() parameters to make_charger() parameters
+            for param_name in inspect.signature(cls).parameters:
+                if param_name == 'repository':
+                    parameters.append(repository)
+                elif param_name == 'rounding_digits':
+                    parameters.append(rounding_digits)
+                elif param_name == 'max_seconds':
+                    parameters.append(max_seconds)
+                elif param_name == 'nauty':
+                    parameters.append(nauty)
+            # return instance of cls
+            return cls(*parameters)
     raise ValueError('Invalid charger name {}'.format(name))

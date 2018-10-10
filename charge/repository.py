@@ -254,7 +254,7 @@ class _ChargeWorker:
         self.__color_key = color_key
         self.__nauty = Nauty()
 
-    def process(self, molid: int, graph: nx.Graph) -> Dict[List]:
+    def process(self, molid: int, graph: nx.Graph) -> Dict[str, List]:
         charges = defaultdict(list)
 
         for _, key, partial_charge in atoms_neighborhoods_charges(
@@ -275,7 +275,7 @@ class _TraceableChargeWorker:
         self.__color_key = color_key
         self.__nauty = Nauty()
 
-    def process(self, molid: int, graph: nx.Graph) -> Dict[List]:
+    def process(self, molid: int, graph: nx.Graph) -> Dict[str, List]:
         charges = defaultdict(list)
 
         for atom, key, partial_charge in atoms_neighborhoods_charges(

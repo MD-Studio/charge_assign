@@ -500,51 +500,7 @@ class ModeCollector(HistogramCollector):
             rounding_digits: int,
             nauty: Optional[Nauty] = None
     ) -> None:
-        super().__init__(repository, rounding_digits, nauty)
-
-    def collect_values(
-            self,
-            graph: nx.Graph,
-            iacm_data_only: bool,
-            shells: List[int],
-            **kwargs: Any
-            ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
-        """Collect charges for a graph's atoms from a Repository.
-
-        For each atom in the graph, this function will determine its \
-        neighborhood, then collect all charges for such an atom with \
-        such a neighborhood from the given repository. It does this \
-        starting with the first shell size in shells, and continues \
-        trying with subsequent shell sizes until at least one charge \
-        is found (so you probably want to sort shells in descending \
-        order). Finally, it summarizes the found charges using a \
-        histogram, and returns the course-grained surrogate charges.
-
-        The nodes (atoms) in the graph are assumed to have an \
-        'atom_type' data attribute associated with them containing the \
-        elemental atom type and may have an 'iacm' attribute as well \
-        with the IACM atom type.
-
-        Args:
-            graph: The graph to collect charges for
-            iacm_data_only: If true, only use IACM data in the \
-                    repository, and do not fall back to plain element \
-                    data.
-            shells: A list of shell sizes to try, in order, until a \
-                    match is found.
-            scoring:
-
-        Raises:
-            AssignmentError: If no charges could be found for at least \
-                    one of the atoms in the molecule.
-
-        Returns:
-            A dictionary mapping atoms (nodes) in graph to lists of \
-                    charges and their weights. The list will be empty \
-                    if no charge is found.
-        """
-        kwargs['scoring'] = self.score_histogram_count
-        return super().collect_values(graph, iacm_data_only, shells, **kwargs)
+        super().__init__(repository, rounding_digits, nauty, self.score_histogram_count)
 
     def _calculate_histogram(
             self,

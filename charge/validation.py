@@ -312,7 +312,7 @@ def cross_validate_molecule(
     charger = make_charger(charger_type, filtered_repository, 3, 10, nauty)
 
     test_graph = strip_molecule(graph, iacm)
-    total_charge = sum([charge for _, charge in graph.nodes(data='partial_charge')])
+    total_charge = round(sum([charge for _, charge in graph.nodes(data='partial_charge')]))
 
     try:
         charger.charge(test_graph, total_charge, False, iacm, shells)

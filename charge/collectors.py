@@ -369,8 +369,8 @@ class HistogramCollector(Collector):
             spacing += 1
 
         nonzero_bins = np.nonzero(counts)
-        counts = list(counts[nonzero_bins])
-        bin_centers = list(bin_centers[nonzero_bins])
+        counts = counts[nonzero_bins].tolist()
+        bin_centers = bin_centers[nonzero_bins].tolist()
 
         return bin_centers, counts
 

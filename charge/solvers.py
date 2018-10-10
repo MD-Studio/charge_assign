@@ -301,7 +301,11 @@ class DPSolver(Solver):
                 except ValueError:
                     dp[d] = -float('inf')
 
-        max_pos, max_val = max(enumerate(dp[lower:upper + 1]), key=lambda x: x[1])
+        if lower < 0 and upper >= -1:
+            dps = dp[lower:] + dp[:upper + 1]
+        else:
+            dps = dp[lower:upper + 1]
+        max_pos, max_val = max(enumerate(dps), key=lambda x: x[1])
 
         solutionTime += perf_counter()
 

@@ -214,7 +214,7 @@ class DPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
-        self._solver = ILPSolver(rounding_digits, max_seconds)
+        self._solver = DPSolver(rounding_digits)
 
 
 class CDPCharger(Charger):
@@ -247,7 +247,7 @@ class CDPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
-        self._solver = ILPSolver(rounding_digits, max_seconds)
+        self._solver = CDPSolver(rounding_digits)
 
 
 def make_charger(

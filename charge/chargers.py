@@ -329,7 +329,7 @@ def make_charger(
         max_seconds: int,
         nauty: Optional[Nauty] = None,
         scoring: Optional[MethodType] = None,
-        max_bins: Optional[int] = 0) -> Charger:
+        max_bins: Optional[int] = MAX_BINS) -> Charger:
     # get all classes in this module
     clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     for cls_name, cls in clsmembers:

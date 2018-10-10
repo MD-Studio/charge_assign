@@ -1,12 +1,13 @@
 import inspect
 import sys
 from abc import ABC, abstractmethod
+from types import MethodType
 from typing import Iterable, Optional, Union
 
 import networkx as nx
 
 from charge import util
-from charge.collectors import HistogramCollector, MeanCollector
+from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS
@@ -125,7 +126,7 @@ class Charger(ABC):
             graph.graph['total_charge_redist'] = round(total_charge_redist, self._rounding_digits)
 
 
-class SimpleCharger(Charger):
+class MeanCharger(Charger):
     """A simple reliable charger.
 
     This charger assigns the mean of all matching charges in the \
@@ -138,7 +139,7 @@ class SimpleCharger(Charger):
             rounding_digits: int,
             nauty: Optional[Nauty]=None
             ) -> None:
-        """Create a SimpleCharger.
+        """Create a MeanCharger.
 
         Nauty instances manage an external process, so they're \
         somewhat expensive to create. If you have multiple chargers, \
@@ -154,6 +155,65 @@ class SimpleCharger(Charger):
         self._solver = SimpleSolver(rounding_digits)
 
 
+class MedianCharger(Charger):
+    """A simple reliable charger.
+
+    This charger assigns the median of all matching charges in the \
+    repository. As long as there is at least one matching charge for \
+    each atom, it will give an answer.
+    """
+    def __init__(
+            self,
+            repository: Repository,
+            rounding_digits: int,
+            nauty: Optional[Nauty]=None
+            ) -> None:
+        """Create a MeanCharger.
+
+        Nauty instances manage an external process, so they're \
+        somewhat expensive to create. If you have multiple chargers, \
+        you could consider sharing one between them.
+
+        Args:
+            repository: The repository to get charges from
+            rounding_digits: Number of digits to round charges to
+            nauty: An external Nauty instance to use
+        """
+        super().__init__(repository, rounding_digits, nauty)
+        self._collector = MedianCollector(repository, rounding_digits, self._nauty)
+        self._solver = SimpleSolver(rounding_digits)
+
+
+class ModeCharger(Charger):
+    """A simple reliable charger.
+
+    This charger assigns the mode of the histogram of all matching \
+    charges in the repository. If the histogram is multimodal, it \
+    chooses the mode closest to the median. As long as there is at \
+    least one matching charge for each atom, it will give an answer.
+    """
+    def __init__(
+            self,
+            repository: Repository,
+            rounding_digits: int,
+            nauty: Optional[Nauty]=None
+            ) -> None:
+        """Create a ModeCharger.
+
+        Nauty instances manage an external process, so they're \
+        somewhat expensive to create. If you have multiple chargers, \
+        you could consider sharing one between them.
+
+        Args:
+            repository: The repository to get charges from
+            rounding_digits: Number of digits to round charges to
+            nauty: An external Nauty instance to use
+        """
+        super().__init__(repository, rounding_digits, nauty)
+        self._collector = ModeCollector(repository, rounding_digits, self._nauty)
+        self._solver = SimpleSolver(rounding_digits)
+
+
 class ILPCharger(Charger):
     """A charger that uses Integer Linear Programming.
 
@@ -165,7 +225,8 @@ class ILPCharger(Charger):
             repository: Repository,
             rounding_digits: int,
             max_seconds: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            scoring: Optional[MethodType]=None
             ) -> None:
         """Create an ILPCharger.
 
@@ -180,9 +241,13 @@ class ILPCharger(Charger):
                     found within this limit, an exception will be \
                     raised.
             nauty: An external Nauty instance to use
+            scoring: A scoring function for the histogram. See \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
         self._solver = ILPSolver(rounding_digits, max_seconds)
 
 
@@ -197,7 +262,8 @@ class DPCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            scoring: Optional[MethodType]=None
             ) -> None:
         """Create an DPCharger.
 
@@ -209,9 +275,13 @@ class DPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            scoring: A scoring function for the histogram. See \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
         self._solver = DPSolver(rounding_digits)
 
 
@@ -226,7 +296,8 @@ class CDPCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            scoring: Optional[MethodType]=None
             ) -> None:
         """Create a CDPCharger.
 
@@ -238,15 +309,19 @@ class CDPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            scoring: A scoring function for the histogram collector. See \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
         """
         super().__init__(repository, rounding_digits, nauty)
-        self._collector = HistogramCollector(repository, rounding_digits, self._nauty)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring)
         self._solver = CDPSolver(rounding_digits)
 
 
 def make_charger(
         name: str, repository: Repository, rounding_digits: int,
-        max_seconds: int, nauty: Optional[Nauty] = None) -> Charger:
+        max_seconds: int, nauty: Optional[Nauty] = None, scoring: Optional[MethodType] = None) -> Charger:
     # get all classes in this module
     clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
     for cls_name, cls in clsmembers:
@@ -263,6 +338,8 @@ def make_charger(
                     parameters.append(max_seconds)
                 elif param_name == 'nauty':
                     parameters.append(nauty)
+                elif param_name == 'scoring':
+                    parameters.append(scoring)
             # return instance of cls
             return cls(*parameters)
     raise ValueError('Invalid charger name {}'.format(name))

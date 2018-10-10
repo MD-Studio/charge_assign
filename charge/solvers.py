@@ -43,9 +43,10 @@ class Solver(ABC):
 
 
 class SimpleSolver(Solver):
-    """A trivial solver that assigns the mean of the found charges.
+    """A trivial solver that assigns a single statistics of the found charges.
 
-    Use the MeanCollector to produce appropriate charge distributions.
+    Use the MeanCollector, MedianCollector or ModeCollector to produce \
+    appropriate charge distributions.
     """
     def __init__(self, rounding_digits: int) -> None:
         self.__rounding_digits = rounding_digits

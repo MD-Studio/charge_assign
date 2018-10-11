@@ -19,17 +19,24 @@ double solve_dp(double weights[], double profits[],
 
     // transform weights to non-negative integers
     double tc = (double) total_charge;
+    double max_sum = 0.0;
     for (k = 0; k < num_sets; k ++)
     {
         double wmin = INFINITY;
+        double wmax = -INFINITY;
         for (i = 0; i < sets[k]; i++)
         {
             if (weights[i + offset] < wmin)
             {
                 wmin = weights[i + offset];
             }
+            if (weights[i + offset] > wmax)
+            {
+                wmax = weights[i + offset];
+            }
         }
         tc -= wmin;
+        max_sum += wmax - wmin;
         for (i = 0; i < sets[k]; i++)
         {
             w[i + offset] = lround(blowup * (weights[i + offset] - wmin));
@@ -40,6 +47,15 @@ double solve_dp(double weights[], double profits[],
     // lower and upper capacity limits
     unsigned long upper = lround(blowup * (tc + total_charge_diff));
     unsigned long lower = lround(blowup * fmax(tc - total_charge_diff, 0.0));
+
+    // check if feasible solutions may exist
+    unsigned long reachable = lround(blowup * max_sum);
+    if (upper < 0 || lower > reachable)
+    {
+        // sum of min weights over all sets is larger than the upper bound
+        // or sum of max weights over all sets is smaller than the lower bound
+        return -INFINITY;
+    }
 
     // init DP and traceback tables
     double dp[upper + 1];

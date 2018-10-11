@@ -273,34 +273,53 @@ class DPSolver(Solver):
 
         solutionTime = -perf_counter()
 
+        # transform weights to non-negative integers
         pos_total_charge = total_charge
+        max_sum = 0
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(zip(itertools.repeat(k), range(len(charges))))
             w_min[k] = min(charges)
+            max_sum += max(charges) - w_min[k]
             items.append(list(zip(range(len(charges)),
                              [round(blowup * (charge - w_min[k])) for charge in charges],
                              frequencies)))
             pos_total_charge -= w_min[k]
 
+        # lower and upper capacity limits
         upper = round(blowup * (pos_total_charge + total_charge_diff))
         lower = max(0, round(blowup * (pos_total_charge - total_charge_diff)))
 
+        # check if feasible solutions may exist
+        reachable = round(blowup * max_sum)
+        if upper < 0 or lower > reachable:
+            # sum of min weights over all sets is larger than the upper bound
+            # or sum of max weights over all sets is smaller than the lower bound
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                                  ' with a SimpleCharger')
+
+        # init DP and traceback tables
         dp = [0] + [-float('inf')] * upper
         tb = [[] for _ in range(upper + 1)]
 
+        # DP
+        # iterate over all sets
         for items_l in items:
+            # iterate over all capacities
             for d in range(upper, -1, -1):
                 try:
+                    # find max. profit with capacity i over all items j in set k
                     idx, dp[d] = max(
                         ((item[0], dp[d - item[1]] + item[2]) for item in items_l if d - item[1] >= 0),
                         key=lambda x: x[1]
                     )
+                    # copy old traceback indices and add new index to traceback
                     if dp[d] >= 0:
                         tb[d] = tb[d - items_l[idx][1]] + [idx]
                 except ValueError:
                     dp[d] = -float('inf')
 
+        # find max profit
         max_pos, max_val = max(enumerate(dp[lower:upper + 1]), key=lambda x: x[1])
 
         solutionTime += perf_counter()

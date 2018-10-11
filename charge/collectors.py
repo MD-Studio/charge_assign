@@ -528,6 +528,6 @@ class ModeCollector(HistogramCollector):
         median_charge = median(charges)
 
         mode_charge, mode_count = max(zip(bin_centers, counts),
-                                      key=lambda charge, count: (count, -abs(median_charge - charge)))
+                                      key=lambda x: (x[1], -abs(median_charge - x[0])))
 
         return [mode_charge], [mode_count]

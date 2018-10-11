@@ -409,9 +409,11 @@ def validation_data_dir():
     this_file = Path(__file__)
     return this_file.parent / 'validation_data'
 
-# TODO add median / mode chargers
+
 @pytest.fixture(params=[
     ('MeanCharger', False), ('MeanCharger', True),
+    ('MedianCharger', False), ('MedianCharger', True),
+    ('ModeCharger', False), ('ModeCharger', True),
     ('ILPCharger', False), ('ILPCharger', True),
     ('DPCharger', False), ('DPCharger', True),
     ('CDPCharger', False), ('CDPCharger', True)])

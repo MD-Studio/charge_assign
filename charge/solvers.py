@@ -284,7 +284,7 @@ class DPSolver(Solver):
             pos_total_charge -= w_min[k]
 
         upper = round(blowup * (pos_total_charge + total_charge_diff))
-        lower = round(blowup * (pos_total_charge - total_charge_diff))
+        lower = max(0, round(blowup * (pos_total_charge - total_charge_diff)))
 
         dp = [0] + [-float('inf')] * upper
         tb = [[] for _ in range(upper + 1)]
@@ -301,11 +301,7 @@ class DPSolver(Solver):
                 except ValueError:
                     dp[d] = -float('inf')
 
-        if lower < 0 and upper >= -1:
-            dps = dp[lower:] + dp[:upper + 1]
-        else:
-            dps = dp[lower:upper + 1]
-        max_pos, max_val = max(enumerate(dps), key=lambda x: x[1])
+        max_pos, max_val = max(enumerate(dp[lower:upper + 1]), key=lambda x: x[1])
 
         solutionTime += perf_counter()
 

@@ -1,12 +1,10 @@
 import os
-from math import sqrt
 import warnings
 
-from charge.chargers import SimpleCharger, ILPCharger, DPCharger, CDPCharger
 from charge.nauty import Nauty
 from charge.validation import (cross_validate_molecules, _FilteredCharges,
-        _FilteredRepository, AtomReport, MoleculeReport, strip_molecule,
-        ValidationReport, cross_validate_molecule)
+                               _FilteredRepository, AtomReport, MoleculeReport, strip_molecule,
+                               cross_validate_molecule)
 
 
 def test_filtered_charges_1(mock_traceable_charges) -> None:
@@ -188,7 +186,7 @@ def test_cross_validate_molecules(lgf_data_dir):
 
     with warnings.catch_warnings(record=True) as w:
         report = cross_validate_molecules(
-                'SimpleCharger', True, str(lgf_data_dir))
+                'MeanCharger', True, str(lgf_data_dir))
         all_warnings = w
 
     assert report.molecule.total_mols + len(all_warnings) == num_molecules

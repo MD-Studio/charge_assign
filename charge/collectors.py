@@ -77,9 +77,9 @@ class SimpleCollector(Collector, metaclass=ABCMeta):
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
         """
-        self.__repository = repository
-        self.__rounding_digits = rounding_digits
-        self.__nauty = nauty if nauty is not None else Nauty()
+        self._repository = repository
+        self._rounding_digits = rounding_digits
+        self._nauty = nauty if nauty is not None else Nauty()
 
     def collect_values(
             self,
@@ -129,12 +129,12 @@ class SimpleCollector(Collector, metaclass=ABCMeta):
                 attribute = 'iacm' if atom_has_iacm else 'atom_type'
                 charges[atom] = self._collect(
                         graph, atom, shell_size, attribute,
-                        self.__repository.charges_iacm)
+                        self._repository.charges_iacm)
 
                 if not charges[atom] and not iacm_data_only:
                     charges[atom] = self._collect(
                             graph, atom, shell_size, 'atom_type',
-                            self.__repository.charges_elem)
+                            self._repository.charges_elem)
 
                 if charges[atom]:
                     break
@@ -197,10 +197,10 @@ class MeanCollector(SimpleCollector):
             ) -> Tuple[ChargeList, WeightList]:
         """Collect charges for a particular atom."""
         if shell_size in charges:
-            key = self.__nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
+            key = self._nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
             if key in charges[shell_size]:
                 values = charges[shell_size][key]
-                mean_charge = round(float(np.mean(values)), self.__rounding_digits)
+                mean_charge = round(float(np.mean(values)), self._rounding_digits)
                 return [mean_charge], [1.0]
         return None
 
@@ -241,10 +241,10 @@ class MedianCollector(SimpleCollector):
             ) -> Tuple[ChargeList, WeightList]:
         """Collect charges for a particular atom."""
         if shell_size in charges:
-            key = self.__nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
+            key = self._nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
             if key in charges[shell_size]:
                 values = charges[shell_size][key]
-                median_charge = round(median(values), self.__rounding_digits)
+                median_charge = round(median(values), self._rounding_digits)
                 return [median_charge], [1.0]
         return None
 
@@ -274,11 +274,11 @@ class HistogramCollector(Collector):
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int]=MAX_BINS
             ) -> None:
-        self.__repository = repository
-        self.__rounding_digits = rounding_digits
-        self.__nauty = nauty if nauty is not None else Nauty()
-        self.__score_hist = scoring if scoring else self.score_histogram_log
-        self.max_bins = max(max_bins, 1)
+        self._repository = repository
+        self._rounding_digits = rounding_digits
+        self._nauty = nauty if nauty is not None else Nauty()
+        self._score_hist = scoring if scoring else self.score_histogram_log
+        self._max_bins = max(max_bins, 1)
 
     def collect_values(
             self,
@@ -324,23 +324,23 @@ class HistogramCollector(Collector):
 
         for atom in graph.nodes():
             for shell in shells:
-                if shell in self.__repository.charges_iacm:
-                    key = self.__nauty.canonize_neighborhood(
+                if shell in self._repository.charges_iacm:
+                    key = self._nauty.canonize_neighborhood(
                             graph, atom, shell,
                             color_key='iacm' if 'iacm' in graph.node[atom] else 'atom_type')
-                    if key in self.__repository.charges_iacm[shell]:
-                        charges = self.__repository.charges_iacm[shell][key]
-                        hist = self._calculate_histogram(charges, self.max_bins)
-                        histograms[atom] = self.__score_hist(hist, float(np.mean(charges)))
+                    if key in self._repository.charges_iacm[shell]:
+                        charges = self._repository.charges_iacm[shell][key]
+                        hist = self._calculate_histogram(charges, self._max_bins)
+                        histograms[atom] = self._score_hist(hist, float(np.mean(charges)))
                         break
 
                 if not iacm_data_only:
-                    if shell in self.__repository.charges_elem:
-                        key = self.__nauty.canonize_neighborhood(graph, atom, shell)
-                        if key in self.__repository.charges_elem[shell]:
-                            charges = self.__repository.charges_elem[shell][key]
-                            hist = self._calculate_histogram(charges, self.max_bins)
-                            histograms[atom] = self.__score_hist(hist, float(np.mean(charges)))
+                    if shell in self._repository.charges_elem:
+                        key = self._nauty.canonize_neighborhood(graph, atom, shell)
+                        if key in self._repository.charges_elem[shell]:
+                            charges = self._repository.charges_elem[shell][key]
+                            hist = self._calculate_histogram(charges, self._max_bins)
+                            histograms[atom] = self._score_hist(hist, float(np.mean(charges)))
                             break
             else:
                 no_vals.append(atom)
@@ -384,7 +384,7 @@ class HistogramCollector(Collector):
             max_bins: The maximum number of bins the histogram should have
         """
 
-        grain = 10**(-self.__rounding_digits)
+        grain = 10**(-self._rounding_digits)
 
         # calc F-D width
         iqr = third_quartile(charges) - first_quartile(charges)

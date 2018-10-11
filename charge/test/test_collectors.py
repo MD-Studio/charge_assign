@@ -64,9 +64,9 @@ def test_histogram_collector(ref_graph, mock_repository):
 
 
 def test_histogram_collector_max_bins(ref_graph, mock_repository):
-    collector = HistogramCollector(mock_repository, 2)
+    collector = HistogramCollector(mock_repository, 2, max_bins=1)
 
-    means = collector.collect_values(ref_graph, False, [3, 2, 1, 0], max_bins=1)
+    means = collector.collect_values(ref_graph, False, [3, 2, 1, 0])
 
     assert means[1][0] == pytest.approx([0.31])
     assert means[1][1] == pytest.approx([log(3.0)])

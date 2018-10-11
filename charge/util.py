@@ -1,6 +1,7 @@
 from collections import deque
+from math import ceil
 from time import perf_counter
-from typing import Any
+from typing import Any, List
 
 import networkx as nx
 
@@ -165,3 +166,44 @@ def iacmize(graph: nx.Graph) -> nx.Graph:
             graph.node[atom]['iacm'] = element
 
     return graph
+
+
+def round_to(x, grain):
+    # rounds to nearest multiple of grain, with 0.5 rounded down
+    return ceil((x / grain) - 0.5) * grain
+
+
+def median(values: List[float]):
+    n = len(values)
+    h = n // 2
+    if n % 2 == 0:
+        return sum(values[h - 1:h + 1]) / 2.0
+    else:
+        return values[h]
+
+
+# numpy.percentile isn't quite as accurate for small lists
+def first_quartile(values: List[float]):
+    n = len(values)
+    if n == 1:
+        return values[0]
+    if n % 2 == 0:
+        return median(values[0:n // 2])
+    q = n // 4
+    if n % 4 == 1:
+        return 0.75 * values[q - 1] + 0.25 * values[q]
+    if n % 4 == 3:
+        return 0.75 * values[q] + 0.25 * values[q + 1]
+
+
+def third_quartile(values: List[float]):
+    n = len(values)
+    if n == 1:
+        return values[0]
+    if n % 2 == 0:
+        return median(values[n // 2:])
+    q = n // 4
+    if n % 4 == 1:
+        return 0.25 * values[3 * q] + 0.75 * values[3 * q + 1]
+    if n % 4 == 3:
+        return 0.25 * values[3 * q + 1] + 0.75 * values[3 * q + 2]

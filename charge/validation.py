@@ -1,18 +1,18 @@
-from collections import MutableMapping
 import copy
 import json
 import math
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
+from collections import MutableMapping
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from warnings import warn
 
 import networkx as nx
 
 from charge.babel import convert_from, IOType
-from charge.chargers import Charger, make_charger
+from charge.charge_types import Atom
+from charge.chargers import make_charger, MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.types import Atom
 from charge.util import AssignmentError
 
 
@@ -42,14 +42,14 @@ def cross_validate_methods(
     mean_abs_err = dict()
     mean_sq_err = dict()
 
-    for charger_type in [SimpleCharger, ILPCharger, DPCharger, CDPCharger]:
+    for charger_type in [MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger]:
         charger_name = charger_type.__name__
         mean_abs_err[charger_name] = dict()
         mean_sq_err[charger_name] = dict()
         for iacm in [True, False]:
             mae, mse = (
                     cross_validate_molecules(
-                    charger, iacm, data_location, data_type, shell, repo))
+                    charger_name, iacm, data_location, data_type, shell, repo))
             mean_abs_err[charger_name][iacm] = mae
             mean_sq_err[charger_name][iacm] = mse
 

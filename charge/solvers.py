@@ -1,5 +1,5 @@
-from abc import ABC
 import itertools
+from abc import ABC, abstractmethod
 from time import perf_counter
 from typing import Dict, Tuple
 
@@ -7,10 +7,8 @@ import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
-from charge.nauty import Nauty
-from charge.repository import Repository
+from charge.charge_types import Atom, ChargeList, WeightList
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
-from charge.types import Atom, ChargeList, WeightList
 from charge.util import AssignmentError
 
 
@@ -20,6 +18,7 @@ class Solver(ABC):
     Solvers assign charges to atoms based on charge distribution \
     histograms obtained by a Collector.
     """
+    @abstractmethod
     def solve_partial_charges(
             self,
             graph: nx.Graph,
@@ -40,13 +39,14 @@ class Solver(ABC):
                     by a Collector.
             total_charge: The total charge of the molecule.
         """
-        raise NotImplemented()
+        pass
 
 
 class SimpleSolver(Solver):
-    """A trivial solver that assigns the mean of the found charges.
+    """A trivial solver that assigns a single statistics of the found charges.
 
-    Use the MeanCollector to produce appropriate charge distributions.
+    Use the MeanCollector, MedianCollector or ModeCollector to produce \
+    appropriate charge distributions.
     """
     def __init__(self, rounding_digits: int) -> None:
         self.__rounding_digits = rounding_digits

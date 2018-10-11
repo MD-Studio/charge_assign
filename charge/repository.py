@@ -1,22 +1,18 @@
-import bisect
-import math
 import os
-import time
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable, Dict, List, Tuple, Union
-from zipfile import ZipFile, ZIP_DEFLATED
+from typing import Dict, List, Tuple, Union
+from zipfile import ZipFile
 
 import msgpack
 import networkx as nx
 
 from charge.babel import convert_from, IOType
-from charge.nauty import Nauty
-from charge.settings import REPO_LOCATION, IACM_MAP
-from charge.types import Atom
+from charge.charge_types import Atom
 from charge.molecule import atoms_neighborhoods_charges
 from charge.multiprocessor import MultiProcessor
-
+from charge.nauty import Nauty
+from charge.settings import REPO_LOCATION
 
 ChargeSet = Dict[int, Dict[str, List[float]]]
 """A collection of possible charges, indexed by shell size and \
@@ -231,7 +227,7 @@ class _ReadWorker:
         self.__extension = extension
         self.__data_type = data_type
 
-    def process(self, molid: int) -> None:
+    def process(self, molid: int) -> Tuple[int, nx.Graph]:
         filename = os.path.join(
                 self.__data_location, '%d%s' % (molid, self.__extension))
         with open(filename, 'r') as f:
@@ -247,7 +243,7 @@ class _CanonicalizationWorker:
     def __init__(self):
         self.__nauty = Nauty()
 
-    def process(self, molid: int, graph: nx.Graph) -> str:
+    def process(self, molid: int, graph: nx.Graph) -> Tuple[int, str]:
         return molid, self.__nauty.canonize(graph)
 
 
@@ -258,7 +254,7 @@ class _ChargeWorker:
         self.__color_key = color_key
         self.__nauty = Nauty()
 
-    def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
+    def process(self, molid: int, graph: nx.Graph) -> Dict[str, List]:
         charges = defaultdict(list)
 
         for _, key, partial_charge in atoms_neighborhoods_charges(
@@ -279,7 +275,7 @@ class _TraceableChargeWorker:
         self.__color_key = color_key
         self.__nauty = Nauty()
 
-    def process(self, molid: int, graph: nx.Graph) -> defaultdict(list):
+    def process(self, molid: int, graph: nx.Graph) -> Dict[str, List]:
         charges = defaultdict(list)
 
         for atom, key, partial_charge in atoms_neighborhoods_charges(

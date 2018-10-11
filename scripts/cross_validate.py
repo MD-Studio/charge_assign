@@ -53,8 +53,12 @@ if __name__ == '__main__':
     repo_file = 'cross_validation_repository.zip'
     repo = Repository.read(repo_file)
 
-    cross_validate('SimpleCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
-    cross_validate('SimpleCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('MeanCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('MeanCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('MedianCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('MedianCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('ModeCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('ModeCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
     cross_validate('ILPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
     cross_validate('ILPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
     cross_validate('CDPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)

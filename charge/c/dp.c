@@ -45,17 +45,21 @@ double solve_dp(double weights[], double profits[],
     }
 
     // lower and upper capacity limits
-    unsigned long upper = lround(blowup * (tc + total_charge_diff));
-    unsigned long lower = lround(blowup * fmax(tc - total_charge_diff, 0.0));
+    long upper_signed = lround(blowup * (tc + total_charge_diff));
+    long lower_signed = lround(blowup * fmax(tc - total_charge_diff, 0.0));
 
     // check if feasible solutions may exist
-    unsigned long reachable = lround(blowup * max_sum);
-    if (upper < 0 || lower > reachable)
+    long reachable = lround(blowup * max_sum);
+    if (upper_signed < 0 || lower_signed > reachable)
     {
         // sum of min weights over all sets is larger than the upper bound
         // or sum of max weights over all sets is smaller than the lower bound
         return -INFINITY;
     }
+
+    // conversion to unsigned long is now safe
+    unsigned long upper = (unsigned long) upper_signed;
+    unsigned long lower = (unsigned long) lower_signed;
 
     // init DP and traceback tables
     double dp[upper + 1];

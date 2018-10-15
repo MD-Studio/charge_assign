@@ -66,10 +66,16 @@ class AtomReport:
         """Mean squared per-atom charge error"""
 
     def mean_abs_atom_err(self):
-        return self.sum_abs_atom_err / self.total_atoms
+        if self.total_atoms > 0:
+            return self.sum_abs_atom_err / self.total_atoms
+        else:
+            return 0.0
 
     def mean_sq_atom_err(self):
-        return self.sum_sq_atom_err / self.total_atoms
+        if self.total_atoms > 0:
+            return self.sum_sq_atom_err / self.total_atoms
+        else:
+            return 0.0
 
     def rms_atom_err(self):
         return math.sqrt(self.mean_sq_atom_err())
@@ -111,16 +117,25 @@ class MoleculeReport:
     # methods for reading results
 
     def mean_abs_total_err(self):
-        return self.sum_abs_total_err / self.total_mols
+        if self.total_mols > 0:
+            return self.sum_abs_total_err / self.total_mols
+        else:
+            return 0.0
 
     def mean_sq_total_err(self):
-        return self.sum_sq_total_err / self.total_mols
+        if self.total_mols > 0:
+            return self.sum_sq_total_err / self.total_mols
+        else:
+            return 0.0
 
     def rms_total_err(self):
         return math.sqrt(self.mean_sq_total_err())
 
     def mean_time(self):
-        return sum([time for _, _, time, _, _ in self.solver_stats]) / self.total_mols
+        if self.total_mols > 0:
+            return sum([time for _, _, time, _, _ in self.solver_stats]) / self.total_mols
+        else:
+            return 0.0
 
     # methods for adding results
 

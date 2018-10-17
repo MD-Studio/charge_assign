@@ -19,6 +19,7 @@ def print_report(charger, iacm, shell, report, num_warnings):
         print('Cat: {}, atoms: {}'.format(cat, atom_rep.total_atoms))
         print('mae: {}'.format(atom_rep.mean_abs_atom_err()))
         print('mse: {}, rmse: {}'.format(atom_rep.mean_sq_atom_err(), atom_rep.rms_atom_err()))
+        print('number of error values: {}'.format(len(atom_rep.atom_errors)))
 
     print('stats: {}'.format(report.molecule.solver_stats))
 
@@ -30,8 +31,8 @@ def cross_validate(charger, iacm, shell, test_data_dir, repo, bucket, num_bucket
                 repo=repo, bucket=bucket, num_buckets=num_buckets)
         num_warnings = len(w)
 
-    outfile = 'cross_validation_report_{}_{}_{}.json'.format(
-            charger.lower(), bucket, num_buckets)
+    outfile = 'cross_validation_report_{}_{}_{}_{}.json'.format(
+            charger.lower(), int(iacm), bucket, num_buckets)
     with open(outfile, 'w') as f:
         f.write(report.as_json())
 

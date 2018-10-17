@@ -64,6 +64,8 @@ class AtomReport:
         """Mean absolute per-atom charge error"""
         self.sum_sq_atom_err = 0.0
         """Mean squared per-atom charge error"""
+        self.atom_errors = list()  # type: List[float]
+        """All per-atom charge errors"""
 
     def mean_abs_atom_err(self):
         if self.total_atoms > 0:
@@ -84,11 +86,13 @@ class AtomReport:
         self.total_atoms += 1
         self.sum_abs_atom_err += abs(err)
         self.sum_sq_atom_err += err * err
+        self.atom_errors.append(err)
 
     def __iadd__(self, other_report: 'AtomReport') -> 'AtomReport':
         self.total_atoms += other_report.total_atoms
         self.sum_abs_atom_err += other_report.sum_abs_atom_err
         self.sum_sq_atom_err += other_report.sum_sq_atom_err
+        self.atom_errors.extend(other_report.atom_errors)
         return self
 
     def __add__(self, other_report: 'AtomReport') -> 'AtomReport':
@@ -100,7 +104,17 @@ class AtomReport:
         return {
                 'total_atoms': self.total_atoms,
                 'sum_abs_atom_err': self.sum_abs_atom_err,
-                'sum_sq_atom_err': self.sum_sq_atom_err}
+                'sum_sq_atom_err': self.sum_sq_atom_err,
+                'atom_errors': self.atom_errors}
+
+    @staticmethod
+    def from_dict(data: Dict[str, Union[float, int]]) -> 'AtomReport':
+        new_report = AtomReport()
+        new_report.total_atoms = data['total_atoms']
+        new_report.sum_abs_atom_err = data['sum_abs_atom_err']
+        new_report.sum_sq_atom_err = data['sum_sq_atom_err']
+        new_report.atom_errors = data['atom_errors']
+        return new_report
 
 
 class MoleculeReport:
@@ -163,6 +177,15 @@ class MoleculeReport:
                 'sub_sq_total_err': self.sum_sq_total_err,
                 'solver_stats': self.solver_stats}
 
+    @staticmethod
+    def from_dict(data: Dict[str, Union[float, int]]) -> 'MoleculeReport':
+        new_report = MoleculeReport()
+        new_report.total_mols = data['total_mols']
+        new_report.sum_abs_total_err = data['sum_abs_total_err']
+        new_report.sum_sq_total_err = data['sub_sq_total_err']
+        new_report.solver_stats = data['solver_stats']
+        return new_report
+
 
 class ValidationReport:
     def __init__(self) -> None:
@@ -205,6 +228,18 @@ class ValidationReport:
                 'S': self.__atom_reports['S'].as_dict(),
                 'Other': self.__atom_reports['Other'].as_dict()},
             'per_molecule': self.molecule.as_dict()})
+
+    @staticmethod
+    def from_json(path: str) -> 'ValidationReport':
+        with open(path, 'r') as f:
+            data = json.load(f)
+        new_report = ValidationReport()
+        for category in ['C', 'H', 'N', 'O', 'P', 'S', 'Other']:
+            new_report.__atom_reports[category] = AtomReport.from_dict(
+                    data['per_atom'][category])
+        new_report.molecule = MoleculeReport.from_dict(
+                data['per_molecule'])
+        return new_report
 
 
 def cross_validate_molecules(

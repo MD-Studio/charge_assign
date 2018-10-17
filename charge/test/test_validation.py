@@ -56,11 +56,13 @@ def test_atom_report_add_atom_error() -> None:
     assert report.total_atoms == 1
     assert report.sum_abs_atom_err == 0.25
     assert report.sum_sq_atom_err == 0.0625
+    assert report.atom_errors == [0.25]
 
     report.add_atom_error(0.75)
     assert report.total_atoms == 2
     assert report.sum_abs_atom_err == 1.0
     assert report.sum_sq_atom_err == 0.625
+    assert report.atom_errors == [0.25, 0.75]
 
 
 def test_molecule_report_add_total_error() -> None:
@@ -117,11 +119,13 @@ def test_atom_report_aggregation() -> None:
     assert report3.total_atoms == 2
     assert report3.sum_abs_atom_err == 1.0
     assert report3.sum_sq_atom_err == 0.625
+    assert report3.atom_errors == [0.25, 0.75]
 
     report1 += report2
     assert report1.total_atoms == 2
     assert report1.sum_abs_atom_err == 1.0
     assert report1.sum_sq_atom_err == 0.625
+    assert report1.atom_errors == [0.25, 0.75]
 
 
 def test_molecule_report_aggregation() -> None:

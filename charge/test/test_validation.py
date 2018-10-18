@@ -68,15 +68,17 @@ def test_atom_report_add_atom_error() -> None:
 def test_molecule_report_add_total_error() -> None:
     report = MoleculeReport()
 
-    report.add_total_charge_error(0.25)
+    report.add_total_charge_error(0, 0.25)
     assert report.total_mols == 1
     assert report.sum_abs_total_err == 0.25
     assert report.sum_sq_total_err == 0.0625
+    assert report.total_charge_errors == [(0, 0.25)]
 
-    report.add_total_charge_error(0.75)
+    report.add_total_charge_error(1, 0.75)
     assert report.total_mols == 2
     assert report.sum_abs_total_err == 1.0
     assert report.sum_sq_total_err == 0.625
+    assert report.total_charge_errors == [(0, 0.25), (1, 0.75)]
 
 
 def test_atom_report_calculations() -> None:
@@ -132,18 +134,20 @@ def test_molecule_report_aggregation() -> None:
     report1 = MoleculeReport()
     report2 = MoleculeReport()
 
-    report1.add_total_charge_error(0.25)
-    report2.add_total_charge_error(0.75)
+    report1.add_total_charge_error(0, 0.25)
+    report2.add_total_charge_error(1, 0.75)
 
     report3 = report1 + report2
     assert report3.total_mols == 2
     assert report3.sum_abs_total_err == 1.0
     assert report3.sum_sq_total_err == 0.625
+    assert report3.total_charge_errors == [(0, 0.25), (1, 0.75)]
 
     report1 += report2
     assert report1.total_mols == 2
     assert report1.sum_abs_total_err == 1.0
     assert report1.sum_sq_total_err == 0.625
+    assert report1.total_charge_errors == [(0, 0.25), (1, 0.75)]
 
 
 def test_strip_molecule(ref_graph_charged) -> None:

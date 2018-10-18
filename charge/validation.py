@@ -122,11 +122,15 @@ class MoleculeReport:
         self.total_mols = 0
         """Total number of molecules charges were estimated for"""
         self.sum_abs_total_err = 0.0
-        """Mean absolute total charge error"""
+        """Sum of absolute total charge errors"""
         self.sum_sq_total_err = 0.0
-        """Mean squared total charge error"""
-        self.solver_stats = []
-        """List of solver statistics (time, items, scaled_cap)"""
+        """Sumo of squared total charge errors"""
+        self.total_charge_errors = []  # type: List[Tuple[int, float]]
+        """List of total charge errors"""
+        self.solver_stats = []  # type: List[int, float, float, int, float]
+        """List of solver statistics
+        Each tuple contains (molid, mean_abs_atom_err, time, items, scaled_cap)
+        """
 
     # methods for reading results
 
@@ -153,15 +157,17 @@ class MoleculeReport:
 
     # methods for adding results
 
-    def add_total_charge_error(self, err: float) -> None:
+    def add_total_charge_error(self, molid: int, err: float) -> None:
         self.total_mols += 1
         self.sum_abs_total_err += abs(err)
         self.sum_sq_total_err += err * err
+        self.total_charge_errors.append((molid, err))
 
     def __iadd__(self, other_report: 'MoleculeReport') -> 'MoleculeReport':
         self.total_mols += other_report.total_mols
         self.sum_abs_total_err += other_report.sum_abs_total_err
         self.sum_sq_total_err += other_report.sum_sq_total_err
+        self.total_charge_errors.extend(other_report.total_charge_errors)
         self.solver_stats.extend(other_report.solver_stats)
         return self
 
@@ -175,6 +181,7 @@ class MoleculeReport:
                 'total_mols': self.total_mols,
                 'sum_abs_total_err': self.sum_abs_total_err,
                 'sub_sq_total_err': self.sum_sq_total_err,
+                'total_charge_errors': self.total_charge_errors,
                 'solver_stats': self.solver_stats}
 
     @staticmethod
@@ -183,6 +190,7 @@ class MoleculeReport:
         new_report.total_mols = data['total_mols']
         new_report.sum_abs_total_err = data['sum_abs_total_err']
         new_report.sum_sq_total_err = data['sub_sq_total_err']
+        new_report.total_charge_errors = data['total_charge_errors']
         new_report.solver_stats = data['solver_stats']
         return new_report
 
@@ -380,7 +388,7 @@ def cross_validate_molecule(
         atoms_in_this_mol_report.add_atom_error(atom_error)
 
     report.molecule.add_total_charge_error(
-            test_graph.graph['total_charge'] - total_charge)
+            molid, test_graph.graph['total_charge'] - total_charge)
 
     report.molecule.solver_stats.append((
             molid,

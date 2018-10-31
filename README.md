@@ -52,7 +52,8 @@ sudo yum install rdkit
 
 Installation instructions for nauty are available on the [Nauty
 homepage](http://pallini.di.uniroma1.it/). You will have to either add its
-directory to your PATH variable, or add the location of the dreadnaut program
+directory to your PATH variable, set the NAUTY_EXC environment variable to
+the directory, or add the location of the dreadnaut program
 to charge/settings.py.
 
 Next, we can make a virtual environment and install charge_assign and its

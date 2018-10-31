@@ -22,7 +22,7 @@ Once you have obtained a repository, the basic usage of charge_assign is simple 
 	for u, data in mol.nodes(data=True):
 		print(u, data['partial_charge_redist'])
 
-charge_assign offers several different possible charger methods, see the :mod:`charger <charge.chargers>` module.
+charge_assign offers several different possible charger methods, see the :mod:`charger <charge.chargers>` module. To set a default repository location, set the REPO_LOCATION environment variable or add it to charge/settings.py.
 
 
 Batch Computations

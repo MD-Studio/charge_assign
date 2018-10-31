@@ -1,4 +1,5 @@
 # charge_assign
+[![DOI](https://zenodo.org/badge/103553886.svg)](https://zenodo.org/badge/latestdoi/103553886)
 
 ## Requirements
 

@@ -20,7 +20,7 @@ Once you have obtained a repository, the basic usage of charge_assign is simple 
 	charger = CDPCharger(repository=repo)
 	charger.charge(molecule)
 	for u, data in mol.nodes(data=True):
-		print(u, data['partial_charge_redist'])
+	    print(u, data['partial_charge_redist'])
 
 charge_assign offers several different possible charger methods, see the :mod:`charger <charge.chargers>` module. To set a default repository location, set the REPO_LOCATION environment variable or add it to charge/settings.py.
 
@@ -40,14 +40,14 @@ If you are using multiple chargers, you might want to consider using one :class:
 Processing several molecules in parallel can be done using a :class:`MultiProcessor <charge.multiprocessor.MultiProcessor>`::
 
 	class Worker:
-		def __init__(self, repo_location: str):
-			repo = Repository.read(repo_location)
-			self.__charger = CDPCharger(repository=repo)
+	    def __init__(self, repo_location: str):
+	        repo = Repository.read(repo_location)
+	        self.__charger = CDPCharger(repository=repo)
 
-		def process(self, molecule: nx.Graph) -> nx.Graph:
-			charger.charge(molecule)
-			return molecule
+	    def process(self, molecule: nx.Graph) -> nx.Graph:
+	        charger.charge(molecule)
+	        return molecule
 
 	with MultiProcessor(Worker, 'repo.zip') as mp:
-		for c in mp.processed(molecules, 'processing molecules'):
-			pass # do something with the charged molecules
+	    for c in mp.processed(molecules, 'processing molecules'):
+	        pass # do something with the charged molecules

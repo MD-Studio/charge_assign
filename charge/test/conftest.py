@@ -1,5 +1,6 @@
 from collections import defaultdict
 import networkx as nx
+import os
 from pathlib import Path
 import pytest
 
@@ -266,7 +267,7 @@ def ref_graph_nauty_output():
 # Fixtures for testing charge assignment
 
 def dummy_charges():
-    return [0.314, 0.42, 0.2718]
+    return [0.2718, 0.314, 0.42]
 
 
 def dummy_charges2():
@@ -274,15 +275,15 @@ def dummy_charges2():
 
 
 def dummy_charges3():
-    return [0.314, 0.314, 0.42, 0.2718]
+    return [0.2718, 0.314, 0.314, 0.42]
 
 
 def dummy_charges4():
-    return [-0.516, 0.129]
+    return [-0.516, 0.129, 0.129, 0.129]
 
 
 def dummy_charges5():
-    return [-0.516, -0.321]
+    return [-0.516, -0.516, -0.516, -0.516, 0.321]
 
 
 class ExtraDefaultDict(defaultdict):
@@ -399,3 +400,116 @@ def mock_multicharge_repository():
 @pytest.fixture
 def mock_methane_repository():
     return MockMethaneRepository()
+
+
+# fixtures for testing validation
+
+@pytest.fixture
+def validation_data_dir():
+    this_file = Path(__file__)
+    return this_file.parent / 'validation_data'
+
+
+@pytest.fixture(params=[
+    ('MeanCharger', False), ('MeanCharger', True),
+    ('MedianCharger', False), ('MedianCharger', True),
+    ('ModeCharger', False), ('ModeCharger', True),
+    ('ILPCharger', False), ('ILPCharger', True),
+    ('DPCharger', False), ('DPCharger', True),
+    ('CDPCharger', False), ('CDPCharger', True)])
+def charger_iacm(request):
+    return request.param
+
+
+@pytest.fixture
+def mock_traceable_charges():
+    return {
+            'key1': [
+                (0.1, 1, 1),
+                (0.1, 1, 2),
+                (0.2, 2, 3)],
+            'key2': [
+                (0.3, 1, 3),
+                (0.4, 2, 1),
+                (0.4, 2, 2),
+                (0.5, 3, 1)]}
+
+
+def traceable_dummy_charges6():
+    return [(-0.516, 1, 2), (0.129, 1, 1), (0.129, 2, 3), (0.130, 2, 1), (0.329, 2, 2)]
+
+
+def traceable_dummy_charges7():
+    return [(-0.516, 1, 2), (-0.321, 3, 1), (0.129, 1, 1), (0.129, 2, 3), (0.130, 2, 1), (0.329, 2, 2)]
+
+
+def traceable_dummy_chargeset6():
+    chargeset = ExtraDefaultDict(traceable_dummy_charges6)
+    chargeset['c18208da9e290c6faf8a0c58017d24d9'] = traceable_dummy_charges7()
+    return chargeset
+
+
+class MockTraceableRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: traceable_dummy_chargeset6(),
+                1: traceable_dummy_chargeset6(),
+                2: traceable_dummy_chargeset6()
+                }
+
+        self.charges_elem = self.charges_iacm
+
+        self.iso_iacm = {1: [1, 3], 3: [1, 3]}
+        self.iso_elem = {1: [1, 3], 3: [1, 3]}
+
+
+@pytest.fixture
+def mock_traceable_repository():
+    return MockTraceableRepository()
+
+
+@pytest.fixture
+def ref_graph_charged(ref_graph):
+    cgraph = ref_graph.copy()
+    cgraph.nodes[1]['partial_charge'] = -0.516
+    cgraph.nodes[2]['partial_charge'] = 0.129
+    cgraph.nodes[3]['partial_charge'] = 0.129
+    cgraph.nodes[4]['partial_charge'] = 0.129
+    cgraph.nodes[5]['partial_charge'] = 0.129
+    return cgraph
+
+
+def traceable_double_methane_chargeset_elem():
+    return {
+            '92ed00c54b2190be94748bee34b22847': [(-0.516, 1, 2), (-0.516, 2, 2)],
+            '5b5a2d085187e956a3fd3182b536330f': [(0.129, 1, 1), (0.129, 1, 3),
+                (0.129, 1, 4), (0.129, 1, 5), (0.129, 2, 1), (0.129, 2, 3),
+                (0.129, 2, 4), (0.129, 3, 5)]}
+
+
+def traceable_double_methane_chargeset_iacm():
+    return {
+            'c18208da9e290c6faf8a0c58017d24d9': [(-0.516, 1, 2), (-0.516, 2, 2)],
+            '6a683dfdb437b92039fa6dd2bc97c4b2': [(0.129, 1, 1), (0.129, 1, 3),
+                (0.129, 1, 4), (0.129, 1, 5), (0.129, 2, 1), (0.129, 2, 3),
+                (0.129, 2, 4), (0.129, 3, 5)]
+            }
+
+
+class MockTraceableMethaneRepository:
+    def __init__(self):
+        self.charges_iacm = {
+            1: traceable_double_methane_chargeset_iacm()
+            }
+
+        self.charges_elem = {
+            1: traceable_double_methane_chargeset_elem()
+            }
+
+        self.iso_iacm = {}
+        self.iso_elem = {}
+
+
+@pytest.fixture
+def mock_traceable_methane_repository():
+    return MockTraceableMethaneRepository()

@@ -1,5 +1,6 @@
 from charge.collectors import AssignmentError, HistogramCollector, MeanCollector
 
+from math import log
 import networkx as nx
 import pytest
 
@@ -50,30 +51,30 @@ def test_histogram_collector(ref_graph, mock_repository):
 
     means = collector.collect_values(ref_graph, False, [3, 2, 1, 0])
 
-    assert means[1][0] == pytest.approx([0.27, 0.31, 0.42])
-    assert means[1][1] == [1.0, 1.0, 1.0]
-    assert means[2][0] == pytest.approx([0.27, 0.31, 0.42])
-    assert means[2][1] == [1.0, 1.0, 1.0]
-    assert means[3][0] == pytest.approx([0.27, 0.31, 0.42])
-    assert means[3][1] == [1.0, 1.0, 1.0]
-    assert means[4][0] == pytest.approx([0.27, 0.31, 0.42])
-    assert means[4][1] == [1.0, 1.0, 1.0]
-    assert means[5][0] == pytest.approx([0.27, 0.31, 0.42])
-    assert means[5][1] == [1.0, 1.0, 1.0]
+    assert means[1][0] == pytest.approx([0.31, 0.46])
+    assert means[1][1] == pytest.approx([log(2.0), log(1.0)])
+    assert means[2][0] == pytest.approx([0.31, 0.46])
+    assert means[2][1] == pytest.approx([log(2.0), log(1.0)])
+    assert means[3][0] == pytest.approx([0.31, 0.46])
+    assert means[3][1] == pytest.approx([log(2.0), log(1.0)])
+    assert means[4][0] == pytest.approx([0.31, 0.46])
+    assert means[4][1] == pytest.approx([log(2.0), log(1.0)])
+    assert means[5][0] == pytest.approx([0.31, 0.46])
+    assert means[5][1] == pytest.approx([log(2.0), log(1.0)])
 
 
 def test_histogram_collector_max_bins(ref_graph, mock_repository):
-    collector = HistogramCollector(mock_repository, 2)
+    collector = HistogramCollector(mock_repository, 2, max_bins=1)
 
-    means = collector.collect_values(ref_graph, False, [3, 2, 1, 0], max_bins=2)
+    means = collector.collect_values(ref_graph, False, [3, 2, 1, 0])
 
-    assert means[1][0] == pytest.approx([0.30, 0.42])
-    assert means[1][1] == [2.0, 1.0]
-    assert means[1][0] == pytest.approx([0.30, 0.42])
-    assert means[2][1] == [2.0, 1.0]
-    assert means[1][0] == pytest.approx([0.30, 0.42])
-    assert means[3][1] == [2.0, 1.0]
-    assert means[1][0] == pytest.approx([0.30, 0.42])
-    assert means[4][1] == [2.0, 1.0]
-    assert means[1][0] == pytest.approx([0.30, 0.42])
-    assert means[5][1] == [2.0, 1.0]
+    assert means[1][0] == pytest.approx([0.31])
+    assert means[1][1] == pytest.approx([log(3.0)])
+    assert means[2][0] == pytest.approx([0.31])
+    assert means[2][1] == pytest.approx([log(3.0)])
+    assert means[3][0] == pytest.approx([0.31])
+    assert means[3][1] == pytest.approx([log(3.0)])
+    assert means[4][0] == pytest.approx([0.31])
+    assert means[4][1] == pytest.approx([log(3.0)])
+    assert means[5][0] == pytest.approx([0.31])
+    assert means[5][1] == pytest.approx([log(3.0)])

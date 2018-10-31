@@ -103,7 +103,10 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
                 for key in node_keys:
                     if key == 'label' or key == 'atomType' or key == 'label2' or key == 'initColor':
                         continue
-                    attr[key] = values[node_keys[key]]
+                    if key == 'partial_charge':
+                        attr[key] = float(values[node_keys[key]])
+                    else:
+                        attr[key] = values[node_keys[key]]
                 graph.add_node(int(values[node_keys['label']]), **attr)
 
         if edges:

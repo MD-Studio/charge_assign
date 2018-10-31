@@ -1,5 +1,5 @@
-from abc import ABC
 import itertools
+from abc import ABC, abstractmethod
 from time import perf_counter
 from typing import Dict, Tuple
 
@@ -7,10 +7,8 @@ import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
-from charge.nauty import Nauty
-from charge.repository import Repository
-from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
 from charge.charge_types import Atom, ChargeList, WeightList
+from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
 from charge.util import AssignmentError
 
 
@@ -20,6 +18,7 @@ class Solver(ABC):
     Solvers assign charges to atoms based on charge distribution \
     histograms obtained by a Collector.
     """
+    @abstractmethod
     def solve_partial_charges(
             self,
             graph: nx.Graph,
@@ -40,13 +39,14 @@ class Solver(ABC):
                     by a Collector.
             total_charge: The total charge of the molecule.
         """
-        raise NotImplemented()
+        pass
 
 
 class SimpleSolver(Solver):
-    """A trivial solver that assigns the mean of the found charges.
+    """A trivial solver that assigns a single statistics of the found charges.
 
-    Use the MeanCollector to produce appropriate charge distributions.
+    Use the MeanCollector, MedianCollector or ModeCollector to produce \
+    appropriate charge distributions.
     """
     def __init__(self, rounding_digits: int) -> None:
         self.__rounding_digits = rounding_digits
@@ -273,34 +273,53 @@ class DPSolver(Solver):
 
         solutionTime = -perf_counter()
 
+        # transform weights to non-negative integers
         pos_total_charge = total_charge
+        max_sum = 0
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(zip(itertools.repeat(k), range(len(charges))))
             w_min[k] = min(charges)
+            max_sum += max(charges) - w_min[k]
             items.append(list(zip(range(len(charges)),
                              [round(blowup * (charge - w_min[k])) for charge in charges],
                              frequencies)))
             pos_total_charge -= w_min[k]
 
+        # lower and upper capacity limits
         upper = round(blowup * (pos_total_charge + total_charge_diff))
-        lower = round(blowup * (pos_total_charge - total_charge_diff))
+        lower = max(0, round(blowup * (pos_total_charge - total_charge_diff)))
 
+        # check if feasible solutions may exist
+        reachable = round(blowup * max_sum)
+        if upper < 0 or lower > reachable:
+            # sum of min weights over all sets is larger than the upper bound
+            # or sum of max weights over all sets is smaller than the lower bound
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                                  ' with a SimpleCharger')
+
+        # init DP and traceback tables
         dp = [0] + [-float('inf')] * upper
         tb = [[] for _ in range(upper + 1)]
 
+        # DP
+        # iterate over all sets
         for items_l in items:
+            # iterate over all capacities
             for d in range(upper, -1, -1):
                 try:
+                    # find max. profit with capacity i over all items j in set k
                     idx, dp[d] = max(
                         ((item[0], dp[d - item[1]] + item[2]) for item in items_l if d - item[1] >= 0),
                         key=lambda x: x[1]
                     )
+                    # copy old traceback indices and add new index to traceback
                     if dp[d] >= 0:
                         tb[d] = tb[d - items_l[idx][1]] + [idx]
                 except ValueError:
                     dp[d] = -float('inf')
 
+        # find max profit
         max_pos, max_val = max(enumerate(dp[lower:upper + 1]), key=lambda x: x[1])
 
         solutionTime += perf_counter()

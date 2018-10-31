@@ -1,0 +1,16 @@
+{
+    "creators": [
+        {
+            "affiliation": "Heinrich Heine University Duesseldorf",
+            "name": "Engler, Martin S."
+        },
+        {
+            "affiliation": "Netherlands eScience Center",
+            "name": "Veen, Lourens"
+        }
+    ],
+    "license": {
+        "id": "Apache-2.0"
+    },
+    "title": "charge_assign"
+}

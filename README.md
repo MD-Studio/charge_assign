@@ -80,3 +80,21 @@ pytest --cov
 ```
 
 to run the test suite.
+
+## Documentation
+
+To build the documentation, you need to install sphinx first. Installing sphinx is easiest by using Anaconda.
+
+```
+conda install -n charge_assign sphinx sphinx_rtd_theme
+```
+
+Then run sphinx.
+
+```
+source activate charge_assign
+cd charge_assign/doc/
+make html
+```
+
+You can then find the documentation in `charge_assign/doc/build/html/`.

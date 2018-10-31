@@ -1,8 +1,8 @@
-from charge.chargers import CDPCharger, DPCharger, ILPCharger, MeanCharger, MedianCharger, ModeCharger
-
 from math import log
-import networkx as nx
+
 import pytest
+
+from charge.chargers import CDPCharger, DPCharger, ILPCharger, MeanCharger, MedianCharger, ModeCharger
 
 
 def test_mean_charger(mock_repository, ref_graph):

@@ -10,7 +10,6 @@ import networkx as nx
 from charge.settings import NAUTY_EXC
 from charge.util import bfs_nodes
 
-
 Color = Tuple[bool, str]
 """Nodes are colored by whether they are the core node, and then by atom type."""
 

@@ -1,7 +1,6 @@
-from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
-
-import networkx as nx
 import pytest
+
+from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
 
 
 def test_simple_solver(ref_graph):

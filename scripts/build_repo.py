@@ -1,8 +1,6 @@
 import os
-import warnings
 
 from charge.repository import Repository
-
 
 if __name__ == '__main__':
 

@@ -31,8 +31,7 @@ class Charger(ABC):
 
         Args:
             repository: The repository to obtain charges from
-            rounding_digits: Number of significant digits to round
-                    charges to.
+            rounding_digits: Number of significant digits to round charges to.
             nauty: An external Nauty instance to use for canonization
         """
         # These are all protected, not private

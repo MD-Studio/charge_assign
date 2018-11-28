@@ -338,13 +338,13 @@ def make_charger(
     for cls_name, cls in clsmembers:
         # find class with the matching name
         if cls_name == name:
-            parameters = []
+            parameters = dict()
             # match cls.__init__() parameters to make_charger() parameters
             for param_name in inspect.signature(cls).parameters:
                 if param_name in local_vars:
-                    parameters.append(local_vars[param_name])
+                    parameters[param_name] = local_vars[param_name]
             # return instance of cls
-            return cls(*parameters)
+            return cls(**parameters)
 
     # class not found
     raise ValueError('Invalid charger name {}'.format(name))

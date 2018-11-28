@@ -149,6 +149,7 @@ class MeanCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MeanCollector(repository, rounding_digits, self._nauty)
@@ -181,6 +182,7 @@ class MedianCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MedianCollector(repository, rounding_digits, self._nauty)
@@ -214,6 +216,7 @@ class ModeCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = ModeCollector(repository, rounding_digits, self._nauty)
@@ -251,6 +254,7 @@ class ILPCharger(Charger):
                     found within this limit, an exception will be \
                     raised.
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
@@ -289,6 +293,7 @@ class DPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
@@ -327,6 +332,7 @@ class CDPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram collector. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \

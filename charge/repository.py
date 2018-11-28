@@ -42,6 +42,7 @@ class Repository:
         min_shell: Minimum shell size in this repository.
         max_shell: Maximum shell size in this repository.
         nauty: Nauty instance.
+        versioning: If True, assigns a unique int to the lists of charges on each change.
 
     Attributes:
         charges_iacm: A dictionary, keyed by shell size, of \
@@ -100,6 +101,7 @@ class Repository:
             min_shell: Minimum shell size to compute.
             max_shell: Maximum shell size to compute.
             nauty: Nauty instance.
+            versioning: If True, assigns a unique int to the lists of charges on each change.
 
         Returns:
             A new Repository with data read and processed.
@@ -140,6 +142,7 @@ class Repository:
         Args:
             location: Path to the zip file (or file like object) to be read.
             nauty: Nauty instance.
+            versioning: If True, assigns a unique int to the lists of charges on each change.
 
         Returns:
             A new Repository.

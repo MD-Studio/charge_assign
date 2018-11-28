@@ -103,15 +103,36 @@ class Collector(ABC):
             shell_size: int,
             key: str
             ) -> Tuple[ChargeList, WeightList]:
-        """TODO document this"""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        processed charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the processed charges and associated weights.
+        """
         pass
 
     def _handle_error(
             self,
             no_vals: List[Atom],
             shells: List[int]
-            ):
-        """TODO document this"""
+            ) -> None:
+        """Raises an AssignmentError if no_vals is not empty.
+
+        Args:
+            no_vals: List of atoms for which no charges could be found.
+            shells: List of tried shell sizes.
+
+        Raises:
+            AssignmentError: If no_vals is not empty.
+        """
         if len(no_vals) > 0:
             err = 'Could not find charges for atoms {0}.'.format(', '.join(map(str, no_vals)))
             if not 0 in shells:
@@ -151,7 +172,20 @@ class MeanCollector(Collector):
             shell_size: int,
             key: str
             ) -> Tuple[ChargeList, WeightList]:
-        """TODO document this"""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the mean of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the mean charge and an arbitrary weight (1).
+        """
         values = chargeset[shell_size][key]
         mean_charge = round(float(np.mean(values)), self._rounding_digits)
         return [mean_charge], [1.0]
@@ -187,7 +221,20 @@ class MedianCollector(Collector):
                  chargeset: EitherChargeSet,
                  shell_size: int,
                  key: str) -> Tuple[ChargeList, WeightList]:
-        """TODO document this"""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the median of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the median charge and an arbitrary weight (1).
+        """
         values = chargeset[shell_size][key]
         median_charge = round(median(values), self._rounding_digits)
         return [median_charge], [1.0]
@@ -227,13 +274,37 @@ class HistogramCollector(Collector):
                  shell_size: int,
                  key: str
                  ) -> Tuple[ChargeList, WeightList]:
-        """TODO document this"""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the histogram of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the charge histogram centers and scores.
+        """
         values = chargeset[shell_size][key]
         hist = self._calculate_histogram(values, self._max_bins)
         return self._score_hist(hist, float(np.mean(values)))
 
-    def _handle_error(self, no_vals: List[Atom], shells: List[int]):
-        """TODO document this"""
+    def _handle_error(
+            self,
+            no_vals: List[Atom], shells: List[int]
+            ) -> None:
+        """Raises an AssignmentError if no_vals is not empty.
+
+        Args:
+            no_vals: List of atoms for which no charges could be found.
+            shells: List of tried shell sizes.
+
+        Raises:
+            AssignmentError: If no_vals is not empty.
+        """
         if len(no_vals) > 0:
             err = 'Could not find charges for atoms {0}.'.format(', '.join(map(str, no_vals)))
             if not 0 in shells:
@@ -389,7 +460,20 @@ class ModeCollector(HistogramCollector):
                  shell_size: int,
                  key: str
                  ) -> Tuple[ChargeList, WeightList]:
-        """TODO document this"""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the mode of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the mode of the charges and the number of values that support it.
+        """
         values = chargeset[shell_size][key]
         bin_centers, counts = self._calculate_histogram(values, self._max_bins)
         median_charge = median(values)
@@ -401,8 +485,15 @@ class ModeCollector(HistogramCollector):
 
 
 class CachingCollector(Collector):
-    """TODO document this"""
+    """A proxy collector that caches return values.
 
+    This collector caches the return values of it another collector. The CachingCollector \
+    can detect changes in the Repository of the other collector, if the Repository's \
+    versioning attribute is set to True.
+
+    Args:
+        basecollector: The collector to cache.
+    """
     def __init__(
             self,
             basecollector: Collector):
@@ -415,6 +506,21 @@ class CachingCollector(Collector):
                  shell_size: int,
                  key: str
                  ) -> Tuple[ChargeList, WeightList]:
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the processed charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            The return value of the base collector.
+        """
+
         cache_key = (id(chargeset), shell_size, key)
         if isinstance(chargeset[shell_size][key], _VersioningList):
             version = chargeset[shell_size][key].version

@@ -10,7 +10,7 @@ from charge import util
 from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector, CachingCollector
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS
+from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS, ILP_SOLVER_MAX_SECONDS
 from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
 
 
@@ -24,7 +24,7 @@ class Charger(ABC):
     @abstractmethod
     def __init__(self,
                  repository: Repository,
-                 rounding_digits: int = ROUNDING_DIGITS,
+                 rounding_digits: Optional[int] = ROUNDING_DIGITS,
                  nauty: Optional[Nauty]=None,
                  **kwargs) -> None:
         """Create a ChargerBase.
@@ -135,7 +135,7 @@ class MeanCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             ) -> None:
@@ -168,7 +168,7 @@ class MedianCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             ) -> None:
@@ -202,7 +202,7 @@ class ModeCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             ) -> None:
@@ -234,8 +234,8 @@ class ILPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
-            max_seconds: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            max_seconds: Optional[int] = ILP_SOLVER_MAX_SECONDS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
@@ -277,7 +277,7 @@ class DPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
@@ -316,7 +316,7 @@ class CDPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
             caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,

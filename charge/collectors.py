@@ -8,7 +8,7 @@ import numpy as np
 
 from charge.charge_types import ChargeList, WeightList
 from charge.nauty import Nauty
-from charge.repository import Repository, EitherChargeSet
+from charge.repository import Repository, EitherChargeSet, _VersioningList
 from charge.settings import MAX_BINS
 from charge.util import AssignmentError, third_quartile, round_to, median, first_quartile
 
@@ -398,3 +398,34 @@ class ModeCollector(HistogramCollector):
                                       key=lambda x: (x[1], -abs(median_charge - x[0])))
 
         return [mode_charge], [mode_count]
+
+
+class CachingCollector(Collector):
+    """TODO document this"""
+
+    def __init__(
+            self,
+            basecollector: Collector):
+        super().__init__(basecollector._repository, basecollector._rounding_digits, basecollector._nauty)
+        self.__base = basecollector
+        self.__cache = dict()
+
+    def _collect(self,
+                 chargeset: EitherChargeSet,
+                 shell_size: int,
+                 key: str
+                 ) -> Tuple[ChargeList, WeightList]:
+        cache_key = (id(chargeset), shell_size, key)
+        if isinstance(chargeset[shell_size][key], _VersioningList):
+            version = chargeset[shell_size][key].version
+        else:
+            version = None
+
+        if cache_key in self.__cache:
+            cache_version, values = self.__cache[cache_key]
+            if not version or version == cache_version:
+                return values
+
+        values = self.__base._collect(chargeset, shell_size, key)
+        self.__cache[cache_key] = (version, values)
+        return values

@@ -266,7 +266,7 @@ class HistogramCollector(Collector):
             max_bins: Optional[int]=MAX_BINS
             ) -> None:
         super().__init__(repository, rounding_digits, nauty)
-        self._score_hist = scoring if scoring else self.score_histogram_log
+        self._score_hist = scoring if scoring else HistogramCollector.score_histogram_log
         self._max_bins = max(max_bins, 1)
 
     def _collect(self,
@@ -382,7 +382,8 @@ class HistogramCollector(Collector):
 
         return bin_centers, counts
 
-    def score_histogram_count(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_count(histogram: Tuple[ChargeList, WeightList],
             *args) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -396,7 +397,8 @@ class HistogramCollector(Collector):
         """
         return histogram
 
-    def score_histogram_log(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_log(histogram: Tuple[ChargeList, WeightList],
                             *args) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -412,7 +414,8 @@ class HistogramCollector(Collector):
         scores = list(map(log, counts))
         return bin_centers, scores
 
-    def score_histogram_martin(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_martin(histogram: Tuple[ChargeList, WeightList],
             mean: float) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -453,7 +456,7 @@ class ModeCollector(HistogramCollector):
             nauty: Optional[Nauty] = None,
             max_bins: Optional[int] = MAX_BINS
     ) -> None:
-        super().__init__(repository, rounding_digits, nauty, self.score_histogram_count, max_bins)
+        super().__init__(repository, rounding_digits, nauty, HistogramCollector.score_histogram_count, max_bins)
 
     def _collect(self,
                  chargeset: EitherChargeSet,

@@ -7,7 +7,7 @@ from typing import Iterable, Optional, Union
 import networkx as nx
 
 from charge import util
-from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector
+from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector, CachingCollector
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS
@@ -136,7 +136,8 @@ class MeanCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a MeanCharger.
 
@@ -151,6 +152,8 @@ class MeanCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MeanCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -165,7 +168,8 @@ class MedianCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a MeanCharger.
 
@@ -180,6 +184,8 @@ class MedianCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MedianCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -195,7 +201,8 @@ class ModeCharger(Charger):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a ModeCharger.
 
@@ -210,6 +217,8 @@ class ModeCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = ModeCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -225,6 +234,7 @@ class ILPCharger(Charger):
             rounding_digits: int,
             max_seconds: int,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -248,6 +258,8 @@ class ILPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = ILPSolver(rounding_digits, max_seconds)
 
 
@@ -263,6 +275,7 @@ class DPCharger(Charger):
             repository: Repository,
             rounding_digits: int,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -283,6 +296,8 @@ class DPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = DPSolver(rounding_digits)
 
 
@@ -298,6 +313,7 @@ class CDPCharger(Charger):
             repository: Repository,
             rounding_digits: int,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -318,6 +334,8 @@ class CDPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = CDPSolver(rounding_digits)
 
 

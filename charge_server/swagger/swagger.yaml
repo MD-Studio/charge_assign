@@ -1,0 +1,51 @@
+---
+swagger: "2.0"
+info:
+  description: "This is the API for the charge assign REST service. It lets you submit\
+    \ a molecule without charges, and sends you back a version of your molecule with\
+    \ atom charges attached."
+  version: "1.0.0"
+  title: "Charge Assign"
+  contact:
+    email: "l.veen@esciencecenter.nl"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+host: "example.com"
+basePath: "/"
+tags:
+- name: "charge_assign"
+  description: "Submit molecules for assigning charges to"
+  externalDocs:
+    description: "Find out more"
+    url: "https://github.com/enitram/charge_assign"
+schemes:
+- "https"
+paths:
+  /charge_assign:
+    post:
+      summary: "Submit a molecule for charging"
+      description: "Accepts input and produces output in Lemon Graph Format, for which\
+        \ there is no MIME type, so this specifies text/plain (which it is). See http://lemon.cs.elte.hu/pub/doc/1.2.3/a00002.html."
+      operationId: "charge_molecule"
+      consumes:
+      - "text/plain"
+      produces:
+      - "text/plain"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Description of the input molecule"
+        required: true
+        schema:
+          type: "string"
+      responses:
+        200:
+          description: "Success"
+        405:
+          description: "Invalid input"
+      x-swagger-router-controller: "charge_server.controllers.default_controller"
+definitions: {}
+externalDocs:
+  description: "Find out more about charge_assign"
+  url: "https://github.com/enitram/charge_assign"

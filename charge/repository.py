@@ -248,15 +248,16 @@ class Repository:
             if not 'meta' in names or not 'charges_iacm' in names or not 'charges_elem' in names:
                 raise ValueError('Zip file is missing "meta", "charges_iacm" or "charges_elem" entries.')
 
-            repo.__min_shell, repo.__max_shell = msgpack.unpackb(
+            repo.__min_shell, repo.__max_shell, repo.__traceable = msgpack.unpackb(
                     zf.read('meta'), encoding='utf-8')
             repo.charges_iacm = msgpack.unpackb(
                     zf.read('charges_iacm'), encoding='utf-8')
             repo.charges_elem = msgpack.unpackb(
                     zf.read('charges_elem'), encoding='utf-8')
 
-            if 'iso_iacm' in names and 'iso_elem' in names:
-                repo.__traceable = True
+            if repo.__traceable:
+                if not 'iso_iacm' in names and not 'iso_elem' in names:
+                    raise ValueError('Zip file is missing "iso_iacm" or "iso_elem" entries.')
                 repo.iso_iacm = msgpack.unpackb(
                         zf.read('iso_iacm'), encoding='utf-8')
                 repo.iso_elem = msgpack.unpackb(
@@ -279,10 +280,10 @@ class Repository:
         """
         with ZipFile(out, mode='w') as zf:
             zf.writestr('meta', msgpack.packb(
-                (self.__min_shell, self.__max_shell)))
+                (self.__min_shell, self.__max_shell, self.__traceable)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
-            if hasattr(self, 'iso_iacm') and hasattr(self, 'iso_elem'):
+            if self.__traceable:
                 zf.writestr('iso_iacm', msgpack.packb(self.iso_iacm))
                 zf.writestr('iso_elem', msgpack.packb(self.iso_elem))
 

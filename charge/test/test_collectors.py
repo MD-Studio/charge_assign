@@ -103,9 +103,7 @@ def test_caching_collector1(ref_graph, mock_versioning_repository):
 
     for shell, chdct in mock_versioning_repository.charges_iacm.items():
         for key in chdct.keys():
-            print(chdct[key].version)
             chdct[key].append(1)
-            print(chdct[key].version)
 
     means1 = collector.collect_values(ref_graph, False, [3, 2, 1, 0])
 

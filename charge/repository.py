@@ -1,5 +1,5 @@
 import os
-from collections import defaultdict, MutableSequence
+from collections import defaultdict
 from io import IOBase
 from itertools import groupby
 from typing import Dict, List, Tuple, Union, Optional, AnyStr
@@ -329,6 +329,7 @@ def proxy():
 
     def proxy_decorator(func):
         def wrapper(*args, **kw):
+            # self.version = uuid4().int
             args[0].version = uuid4().int
             return func(*args, **kw)
 

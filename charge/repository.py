@@ -66,11 +66,14 @@ class Repository:
                  min_shell: int=1,
                  max_shell: int=7,
                  nauty: Optional[Nauty]=None,
+                 traceable: Optional[bool] = False,
                  versioning: Optional[bool]=False) -> None:
 
         self.__nauty = nauty if nauty else Nauty()
         self.__min_shell = max(min_shell, 0)
         self.__max_shell = max_shell
+        self.__versioning = versioning
+        self.__traceable = traceable
 
         if not versioning:
             self.charges_iacm = defaultdict(lambda: defaultdict(list))  # type: EitherChargeSet
@@ -79,8 +82,9 @@ class Repository:
             self.charges_iacm = defaultdict(lambda: defaultdict(_VersioningList))  # type: EitherChargeSet
             self.charges_elem = defaultdict(lambda: defaultdict(_VersioningList))  # type: EitherChargeSet
 
-        self.iso_iacm = defaultdict(list)
-        self.iso_elem = defaultdict(list)
+        if traceable:
+            self.iso_iacm = defaultdict(list)
+            self.iso_elem = defaultdict(list)
 
     @staticmethod
     def create_from(
@@ -106,28 +110,116 @@ class Repository:
         Returns:
             A new Repository with data read and processed.
         """
-        repo = Repository(min_shell, max_shell, nauty, versioning)
-        extension = data_type.get_extension()
+        repo = Repository(min_shell, max_shell, nauty, traceable, versioning)
+        if traceable:
+            repo.charges_iacm, repo.charges_elem, repo.iso_iacm, repo.iso_elem =\
+                repo.__read_data(data_location, data_type, with_iso=True)
+        else:
+            repo.charges_iacm, repo.charges_elem = repo.__read_data(data_location, data_type)
 
+        return repo
+
+    def add_from(
+            self,
+            data_location: str,
+            data_type: IOType = IOType.LGF
+            ) -> None:
+        """Adds a directory of files to the Repository.
+
+        Args:
+            data_location: Path to the data directory.
+            data_type: Type of the files to read.
+
+        Raises:
+            ValueError: If the Repository is traceable.
+        """
+        if self.__traceable:
+            raise ValueError('It is not possible to add data to a traceable repository.')
+
+        charges_iacm, charges_elem = self.__read_data(data_location, data_type)
+
+        for shell_size, chdct in charges_iacm.items():
+            for key, charges in chdct.items():
+                self.charges_iacm[shell_size][key].extend(charges)
+                self.charges_iacm[shell_size][key].sort()
+
+        for shell_size, chdct in charges_elem.items():
+            for key, charges in chdct.items():
+                self.charges_elem[shell_size][key].extend(charges)
+                self.charges_elem[shell_size][key].sort()
+
+    def remove_from(
+            self,
+            data_location: str,
+            data_type: IOType = IOType.LGF
+            ) -> None:
+        """Removes a directory of files from the Repository.
+
+        Args:
+            data_location: Path to the data directory.
+            data_type: Type of the files to read.
+
+        Raises:
+            ValueError: If the Repository is traceable.
+        """
+        if self.__traceable:
+            raise ValueError('It is not possible to remove data from a traceable repository.')
+
+        charges_iacm, charges_elem = self.__read_data(data_location, data_type)
+
+        for shell_size, chdct in charges_iacm.items():
+            for key, charges in chdct.items():
+                for charge in charges:
+                    self.charges_iacm[shell_size][key].remove(charge)
+
+                if len(self.charges_iacm[shell_size][key]) == 0:
+                    del self.charges_iacm[shell_size][key]
+                if len(self.charges_iacm[shell_size]) == 0:
+                    del self.charges_iacm[shell_size]
+
+        for shell_size, chdct in charges_elem.items():
+            for key, charges in chdct.items():
+                for charge in charges:
+                    self.charges_elem[shell_size][key].remove(charge)
+
+                if len(self.charges_elem[shell_size][key]) == 0:
+                    del self.charges_elem[shell_size][key]
+                if len(self.charges_elem[shell_size]) == 0:
+                    del self.charges_elem[shell_size]
+
+    def __read_data(
+            self,
+            data_location: str,
+            data_type: IOType = IOType.LGF,
+            with_iso: bool = False,
+            ) -> Union[Tuple[Dict[int, Dict[str, List[float]]],
+                       Dict[int, Dict[str, List[float]]]],
+                       Tuple[Dict[int, Dict[str, List[float]]],
+                       Dict[int, Dict[str, List[float]]],
+                       Dict[int, List[int]],
+                       Dict[int, List[int]]]]:
+        extension = data_type.get_extension()
         molids = [int(fn.replace(extension, ''))
                   for fn in os.listdir(data_location)
                   if fn.endswith(extension)]
 
         # load graphs
-        graphs = repo.__read_graphs(
-                molids, data_location, extension, data_type)
+        graphs = self.__read_graphs(
+            molids, data_location, extension, data_type)
 
         # process with iacm atom types
-        repo.charges_iacm = repo.__generate_charges(graphs, 'iacm', traceable, versioning)
-        canons = repo.__make_canons(graphs)
-        repo.iso_iacm = repo.__make_isomorphics(molids, canons)
-
+        charges_iacm = self.__generate_charges(graphs, 'iacm', self.__traceable, self.__versioning)
         # process as plain elements
-        repo.charges_elem = repo.__generate_charges(graphs, 'atom_type', traceable, versioning)
-        canons = repo.__make_canons(graphs)
-        repo.iso_elem = repo.__make_isomorphics(molids, canons)
+        charges_elem = self.__generate_charges(graphs, 'atom_type', self.__traceable, self.__versioning)
 
-        return repo
+        if with_iso:
+            canons = self.__make_canons(graphs)
+            iso_iacm = self.__make_isomorphics(molids, canons)
+            canons = self.__make_canons(graphs)
+            iso_elem = self.__make_isomorphics(molids, canons)
+            return charges_iacm, charges_elem, iso_iacm, iso_elem
+        else:
+            return charges_iacm, charges_elem
 
     @staticmethod
     def read(
@@ -144,21 +236,31 @@ class Repository:
             nauty: Nauty instance.
             versioning: If True, assigns a unique int to the lists of charges on each change.
 
+        Raises:
+            ValueError, UnpackValueError, BadZipFile, RuntimeError: If the zip file is corrupted.
+
         Returns:
             A new Repository.
         """
         repo = Repository(nauty=nauty, versioning=versioning)
         with ZipFile(location, mode='r') as zf:
+            names = zf.namelist()
+            if not 'meta' in names or not 'charges_iacm' in names or not 'charges_elem' in names:
+                raise ValueError('Zip file is missing "meta", "charges_iacm" or "charges_elem" entries.')
+
             repo.__min_shell, repo.__max_shell = msgpack.unpackb(
                     zf.read('meta'), encoding='utf-8')
             repo.charges_iacm = msgpack.unpackb(
                     zf.read('charges_iacm'), encoding='utf-8')
             repo.charges_elem = msgpack.unpackb(
                     zf.read('charges_elem'), encoding='utf-8')
-            repo.iso_iacm = msgpack.unpackb(
-                    zf.read('iso_iacm'), encoding='utf-8')
-            repo.iso_elem = msgpack.unpackb(
-                    zf.read('iso_elem'), encoding='utf-8')
+
+            if 'iso_iacm' in names and 'iso_elem' in names:
+                repo.__traceable = True
+                repo.iso_iacm = msgpack.unpackb(
+                        zf.read('iso_iacm'), encoding='utf-8')
+                repo.iso_elem = msgpack.unpackb(
+                        zf.read('iso_elem'), encoding='utf-8')
 
             if versioning:
                 for _, chdct in repo.charges_iacm.items():
@@ -180,8 +282,9 @@ class Repository:
                 (self.__min_shell, self.__max_shell)))
             zf.writestr('charges_iacm', msgpack.packb(self.charges_iacm))
             zf.writestr('charges_elem', msgpack.packb(self.charges_elem))
-            zf.writestr('iso_iacm', msgpack.packb(self.iso_iacm))
-            zf.writestr('iso_elem', msgpack.packb(self.iso_elem))
+            if hasattr(self, 'iso_iacm') and hasattr(self, 'iso_elem'):
+                zf.writestr('iso_iacm', msgpack.packb(self.iso_iacm))
+                zf.writestr('iso_elem', msgpack.packb(self.iso_elem))
 
     def __read_graphs(
             self,

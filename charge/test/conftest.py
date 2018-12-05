@@ -6,6 +6,7 @@ import pytest
 
 from charge.bond_type import BondType
 from charge.nauty import Nauty
+from charge.repository import _VersioningList
 
 
 # Fixtures for testing loading and saving to and from various
@@ -286,6 +287,10 @@ def dummy_charges5():
     return [-0.516, -0.516, -0.516, -0.516, 0.321]
 
 
+def dummy_charges6():
+    return _VersioningList([0.2718, 0.314, 0.42])
+
+
 class ExtraDefaultDict(defaultdict):
     def __contains__(self, member):
         return True
@@ -313,6 +318,10 @@ def dummy_chargeset5():
     chargeset = ExtraDefaultDict(dummy_charges4)
     chargeset['c18208da9e290c6faf8a0c58017d24d9'] = dummy_charges5()
     return chargeset
+
+
+def dummy_chargeset6():
+    return ExtraDefaultDict(dummy_charges6)
 
 
 class MockRepository:
@@ -378,6 +387,17 @@ class MockMethaneRepository:
         self.charges_elem = self.charges_iacm
 
 
+class MockVersioningRepository:
+    def __init__(self):
+        self.charges_iacm = {
+                0: dummy_chargeset6(),
+                1: dummy_chargeset6(),
+                2: dummy_chargeset6()
+                }
+
+        self.charges_elem = dict()
+
+
 @pytest.fixture
 def mock_repository():
     return MockRepository()
@@ -400,6 +420,11 @@ def mock_multicharge_repository():
 @pytest.fixture
 def mock_methane_repository():
     return MockMethaneRepository()
+
+
+@pytest.fixture
+def mock_versioning_repository():
+    return MockVersioningRepository()
 
 
 # fixtures for testing validation

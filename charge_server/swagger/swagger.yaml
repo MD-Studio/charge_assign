@@ -29,12 +29,17 @@ paths:
         \ there is no MIME type, so this specifies text/plain (which it is). See http://lemon.cs.elte.hu/pub/doc/1.2.3/a00002.html."
       operationId: "charge_molecule"
       consumes:
-      - "text/plain"
+      - "text/plain; encoding=utf-8"
       produces:
-      - "text/plain"
+      - "text/plain; encoding=utf-8"
       parameters:
+      - in: "query"
+        name: "total_charge"
+        description: "Desired total charge of the molecule"
+        required: true
+        type: "integer"
       - in: "body"
-        name: "body"
+        name: "molecule"
         description: "Description of the input molecule"
         required: true
         schema:

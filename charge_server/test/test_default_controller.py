@@ -1,14 +1,15 @@
 # coding: utf-8
 
-from __future__ import absolute_import
-
-import os
+from pathlib import Path
 
 from flask import json
 from six import BytesIO
+import tempfile
 
 from charge_server.test import BaseTestCase
 from charge_server import charge_server
+
+from charge.repository import Repository
 
 
 class TestDefaultController(BaseTestCase):
@@ -19,8 +20,13 @@ class TestDefaultController(BaseTestCase):
 
         Submit a molecule for charging
         """
-        repo = os.path.join(os.path.dirname(__file__), 'test_repo.zip')
-        charge_server.init(repo)
+        cur_dir = Path(__file__).parent
+        test_data = cur_dir.parents[1] / 'charge' / 'test' / 'sample_lgf'
+        repo = Repository.create_from(str(test_data))
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_location = str(Path(tmpdir) / 'repo.zip')
+            repo.write(repo_location)
+            charge_server.init(repo_location)
 
         test_lgf = ('@nodes\n'
                     'label\tlabel2\tatomType\tinitColor\t\n'

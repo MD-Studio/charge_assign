@@ -47,8 +47,10 @@ paths:
       responses:
         200:
           description: "Success"
-        405:
+        400:
           description: "Invalid input"
+        404:
+          description: "Charges not found"
       x-swagger-router-controller: "charge_server.controllers.default_controller"
 definitions: {}
 externalDocs:

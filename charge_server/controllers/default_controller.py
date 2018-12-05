@@ -5,6 +5,7 @@ from charge_server import util
 from charge_server import charge_server
 
 from charge.babel import convert_from, convert_to, IOType
+from charge.util import AssignmentError
 
 
 def charge_molecule(molecule: bytes, total_charge: int) -> str:
@@ -18,7 +19,18 @@ def charge_molecule(molecule: bytes, total_charge: int) -> str:
         molecule: Description of the input molecule.
         total_charge: Desired total charge of the molecule.
     """
-    graph = convert_from(molecule.decode('utf-8'), IOType.LGF)
-    charge_server.charge(graph, total_charge)
+    try:
+        graph = convert_from(molecule.decode('utf-8'), IOType.LGF)
+    except (ValueError, AttributeError):
+        return ('Error decoding input, is it valid LGF, and sent as'
+                ' "Content-Type: text/plain" ?'), 400
+
+    try:
+        charge_server.charge(graph, total_charge)
+    except AssignmentError:
+        return ('Charges could not be assigned due to lack of data or because'
+                ' the total charge was too far off from our reference charges.'
+                ), 404
+
     lgf_output = convert_to(graph, IOType.LGF)
     return lgf_output.encode()

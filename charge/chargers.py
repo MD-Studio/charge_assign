@@ -7,10 +7,10 @@ from typing import Iterable, Optional, Union
 import networkx as nx
 
 from charge import util
-from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector
+from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, MedianCollector, CachingCollector
 from charge.nauty import Nauty
 from charge.repository import Repository
-from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS
+from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS, ILP_SOLVER_MAX_SECONDS
 from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
 
 
@@ -24,7 +24,7 @@ class Charger(ABC):
     @abstractmethod
     def __init__(self,
                  repository: Repository,
-                 rounding_digits: int = ROUNDING_DIGITS,
+                 rounding_digits: Optional[int] = ROUNDING_DIGITS,
                  nauty: Optional[Nauty]=None,
                  **kwargs) -> None:
         """Create a ChargerBase.
@@ -135,8 +135,9 @@ class MeanCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a MeanCharger.
 
@@ -148,9 +149,12 @@ class MeanCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MeanCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -164,8 +168,9 @@ class MedianCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a MeanCharger.
 
@@ -177,9 +182,12 @@ class MedianCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = MedianCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -194,8 +202,9 @@ class ModeCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
-            nauty: Optional[Nauty]=None
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             ) -> None:
         """Create a ModeCharger.
 
@@ -207,9 +216,12 @@ class ModeCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = ModeCollector(repository, rounding_digits, self._nauty)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = SimpleSolver(rounding_digits)
 
 
@@ -222,9 +234,10 @@ class ILPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
-            max_seconds: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            max_seconds: Optional[int] = ILP_SOLVER_MAX_SECONDS,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -241,6 +254,7 @@ class ILPCharger(Charger):
                     found within this limit, an exception will be \
                     raised.
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
@@ -248,6 +262,8 @@ class ILPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = ILPSolver(rounding_digits, max_seconds)
 
 
@@ -261,8 +277,9 @@ class DPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -276,6 +293,7 @@ class DPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
@@ -283,6 +301,8 @@ class DPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = DPSolver(rounding_digits)
 
 
@@ -296,8 +316,9 @@ class CDPCharger(Charger):
     def __init__(
             self,
             repository: Repository,
-            rounding_digits: int,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
             nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int] = MAX_BINS
             ) -> None:
@@ -311,6 +332,7 @@ class CDPCharger(Charger):
             repository: The repository to get charges from
             rounding_digits: Number of digits to round charges to
             nauty: An external Nauty instance to use
+            caching: Cache collected charges
             scoring: A scoring function for the histogram collector. See \
              :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
              :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
@@ -318,6 +340,8 @@ class CDPCharger(Charger):
         """
         super().__init__(repository, rounding_digits, nauty)
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
         self._solver = CDPSolver(rounding_digits)
 
 
@@ -338,13 +362,13 @@ def make_charger(
     for cls_name, cls in clsmembers:
         # find class with the matching name
         if cls_name == name:
-            parameters = []
+            parameters = dict()
             # match cls.__init__() parameters to make_charger() parameters
             for param_name in inspect.signature(cls).parameters:
                 if param_name in local_vars:
-                    parameters.append(local_vars[param_name])
+                    parameters[param_name] = local_vars[param_name]
             # return instance of cls
-            return cls(*parameters)
+            return cls(**parameters)
 
     # class not found
     raise ValueError('Invalid charger name {}'.format(name))

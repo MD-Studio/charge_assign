@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod, ABCMeta
+from abc import ABC, abstractmethod
 from math import log
 from types import MethodType
 from typing import Any, Dict, List, Optional, Tuple
@@ -6,14 +6,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import networkx as nx
 import numpy as np
 
+from charge.charge_types import ChargeList, WeightList
 from charge.nauty import Nauty
-from charge.repository import ChargeSet, Repository
+from charge.repository import Repository, EitherChargeSet, _VersioningList
 from charge.settings import MAX_BINS
 from charge.util import AssignmentError, third_quartile, round_to, median, first_quartile
 
 Atom = Any  # TODO: define this for the whole library
-ChargeList = List[float]
-WeightList = List[float]
 
 
 class Collector(ABC):
@@ -22,43 +21,6 @@ class Collector(ABC):
     Collectors query the repository for possible charges for each atom \
     in a molecule graph, and return a histogram describing the \
     distribution of the obtained charges for each atom.
-    """
-    @abstractmethod
-    def collect_values(
-            self,
-            graph: nx.Graph,
-            iacm_data_only: bool,
-            shells: List[int]
-            ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
-        """Collect charges for a graph's atoms.
-
-        For each atom in the graph, return a list of possible \
-        charges.
-
-        Args:
-            graph: The graph to collect charges for
-            iacm_data_only: If true, do not fall back to plain elements
-            shells: A list of shell sizes to try, in order, until a \
-                    match is found.
-
-        Raises:
-            AssignmentError: If no charges could be found for at least \
-                    one of the atoms in the molecule.
-
-        Returns:
-            A dictionary mapping atoms (nodes) in graph to a tuple of \
-                    lists, the first with charges, the second with \
-                    weights.
-        """
-        pass
-
-
-class SimpleCollector(Collector, metaclass=ABCMeta):
-    """A collector that returns single statistics of all charges found.
-
-    For each atom, this collector collects possible charges, then it \
-    returns a single statistical value.
-
     Args:
         repo: The Repository to collect charges from.
         rounding_digits: The number of decimals to round charges to.
@@ -87,27 +49,14 @@ class SimpleCollector(Collector, metaclass=ABCMeta):
             iacm_data_only: bool,
             shells: List[int]
             ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
-        """Collect charges for a graph's atoms from a Repository.
+        """Collect charges for a graph's atoms.
 
-        For each atom in the graph, this function will determine its \
-        neighborhood, then collect all charges for such an atom with \
-        such a neighborhood from the given repository. It does this \
-        starting with the first shell size in shells, and continues \
-        trying with subsequent shell sizes until at least one charge \
-        is found (so you probably want to sort shells in descending \
-        order). Finally, it calculates the mean of the collected \
-        charges and rounds to the given precision.
-
-        The nodes (atoms) in the graph are assumed to have an \
-        'atom_type' data attribute associated with them containing the \
-        elemental atom type and may have an 'iacm' attribute as well \
-        with the IACM atom type.
+        For each atom in the graph, return a list of possible \
+        charges.
 
         Args:
             graph: The graph to collect charges for
-            iacm_data_only: If true, only use IACM data in the \
-                    repository, and do not fall back to plain element \
-                    data.
+            iacm_data_only: If true, do not fall back to plain elements
             shells: A list of shell sizes to try, in order, until a \
                     match is found.
 
@@ -126,42 +75,72 @@ class SimpleCollector(Collector, metaclass=ABCMeta):
         for atom in graph.nodes():
             for shell_size in shells:
                 atom_has_iacm = 'iacm' in graph.node[atom]
-                attribute = 'iacm' if atom_has_iacm else 'atom_type'
-                charges[atom] = self._collect(
-                        graph, atom, shell_size, attribute,
-                        self._repository.charges_iacm)
 
-                if not charges[atom] and not iacm_data_only:
-                    charges[atom] = self._collect(
-                            graph, atom, shell_size, 'atom_type',
-                            self._repository.charges_elem)
+                if atom_has_iacm:
+                    if shell_size in self._repository.charges_iacm:
+                        key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'iacm')
+                        if key in self._repository.charges_iacm[shell_size]:
+                            charges[atom] = self._collect(self._repository.charges_iacm, shell_size, key)
 
-                if charges[atom]:
+                if not atom_has_iacm or (not atom in charges and not iacm_data_only):
+                    if shell_size in self._repository.charges_elem:
+                        key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'atom_type')
+                        if key in self._repository.charges_elem[shell_size]:
+                            charges[atom] = self._collect(self._repository.charges_elem, shell_size, key)
+
+                if atom in charges:
                     break
             else:
                 no_vals.append(atom)
 
-        if len(no_vals) > 0:
-            err = 'Could not find charges for atoms {0}.'.format(', '.join(map(str, no_vals)))
-            if not 0 in shells:
-                err += ' Please retry with a smaller "shell" parameter.'
-            raise AssignmentError(err)
+        self._handle_error(no_vals, shells)
         return charges
 
     @abstractmethod
     def _collect(
             self,
-            graph: nx.Graph,
-            atom: Atom,
+            chargeset: EitherChargeSet,
             shell_size: int,
-            attribute: str,
-            charges: ChargeSet
+            key: str
             ) -> Tuple[ChargeList, WeightList]:
-        """Collect charges for a particular atom."""
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        processed charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the processed charges and associated weights.
+        """
         pass
 
+    def _handle_error(
+            self,
+            no_vals: List[Atom],
+            shells: List[int]
+            ) -> None:
+        """Raises an AssignmentError if no_vals is not empty.
 
-class MeanCollector(SimpleCollector):
+        Args:
+            no_vals: List of atoms for which no charges could be found.
+            shells: List of tried shell sizes.
+
+        Raises:
+            AssignmentError: If no_vals is not empty.
+        """
+        if len(no_vals) > 0:
+            err = 'Could not find charges for atoms {0}.'.format(', '.join(map(str, no_vals)))
+            if not 0 in shells:
+                err += ' Please retry with a smaller "shell" parameter.'
+            raise AssignmentError(err)
+
+
+class MeanCollector(Collector):
     """A collector that returns the mean of all charges found.
 
     For each atom, this collector collects possible charges, then it \
@@ -189,23 +168,30 @@ class MeanCollector(SimpleCollector):
 
     def _collect(
             self,
-            graph: nx.Graph,
-            atom: Atom,
+            chargeset: EitherChargeSet,
             shell_size: int,
-            attribute: str,
-            charges: ChargeSet
+            key: str
             ) -> Tuple[ChargeList, WeightList]:
-        """Collect charges for a particular atom."""
-        if shell_size in charges:
-            key = self._nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
-            if key in charges[shell_size]:
-                values = charges[shell_size][key]
-                mean_charge = round(float(np.mean(values)), self._rounding_digits)
-                return [mean_charge], [1.0]
-        return None
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the mean of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the mean charge and an arbitrary weight (1).
+        """
+        values = chargeset[shell_size][key]
+        mean_charge = round(float(np.mean(values)), self._rounding_digits)
+        return [mean_charge], [1.0]
 
 
-class MedianCollector(SimpleCollector):
+class MedianCollector(Collector):
     """A collector that returns the median of all charges found.
 
     For each atom, this collector collects possible charges, then it \
@@ -231,22 +217,27 @@ class MedianCollector(SimpleCollector):
         """
         super().__init__(repository, rounding_digits, nauty)
 
-    def _collect(
-            self,
-            graph: nx.Graph,
-            atom: Atom,
-            shell_size: int,
-            attribute: str,
-            charges: ChargeSet
-            ) -> Tuple[ChargeList, WeightList]:
-        """Collect charges for a particular atom."""
-        if shell_size in charges:
-            key = self._nauty.canonize_neighborhood(graph, atom, shell_size, attribute)
-            if key in charges[shell_size]:
-                values = charges[shell_size][key]
-                median_charge = round(median(values), self._rounding_digits)
-                return [median_charge], [1.0]
-        return None
+    def _collect(self,
+                 chargeset: EitherChargeSet,
+                 shell_size: int,
+                 key: str) -> Tuple[ChargeList, WeightList]:
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the median of the charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the median charge and an arbitrary weight (1).
+        """
+        values = chargeset[shell_size][key]
+        median_charge = round(median(values), self._rounding_digits)
+        return [median_charge], [1.0]
 
 
 class HistogramCollector(Collector):
@@ -274,79 +265,46 @@ class HistogramCollector(Collector):
             scoring: Optional[MethodType]=None,
             max_bins: Optional[int]=MAX_BINS
             ) -> None:
-        self._repository = repository
-        self._rounding_digits = rounding_digits
-        self._nauty = nauty if nauty is not None else Nauty()
-        self._score_hist = scoring if scoring else self.score_histogram_log
+        super().__init__(repository, rounding_digits, nauty)
+        self._score_hist = scoring if scoring else HistogramCollector.score_histogram_log
         self._max_bins = max(max_bins, 1)
 
-    def collect_values(
-            self,
-            graph: nx.Graph,
-            iacm_data_only: bool,
-            shells: List[int]
-            ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
-        """Collect charges for a graph's atoms from a Repository.
+    def _collect(self,
+                 chargeset: EitherChargeSet,
+                 shell_size: int,
+                 key: str
+                 ) -> Tuple[ChargeList, WeightList]:
+        """Collect charges for a single atom.
 
-        For each atom in the graph, this function will determine its \
-        neighborhood, then collect all charges for such an atom with \
-        such a neighborhood from the given repository. It does this \
-        starting with the first shell size in shells, and continues \
-        trying with subsequent shell sizes until at least one charge \
-        is found (so you probably want to sort shells in descending \
-        order). Finally, it summarizes the found charges using a \
-        histogram, and returns the course-grained surrogate charges.
-
-        The nodes (atoms) in the graph are assumed to have an \
-        'atom_type' data attribute associated with them containing the \
-        elemental atom type and may have an 'iacm' attribute as well \
-        with the IACM atom type.
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the histogram of the charge values.
 
         Args:
-            graph: The graph to collect charges for
-            iacm_data_only: If true, only use IACM data in the \
-                    repository, and do not fall back to plain element \
-                    data.
-            shells: A list of shell sizes to try, in order, until a \
-                    match is found.
-
-        Raises:
-            AssignmentError: If no charges could be found for at least \
-                    one of the atoms in the molecule.
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
 
         Returns:
-            A dictionary mapping atoms (nodes) in graph to lists of \
-                    charges and their weights. The list will be empty \
-                    if no charge is found.
+            A tuple of the containing the charge histogram centers and scores.
         """
-        histograms = dict()
-        no_vals = list()
+        values = chargeset[shell_size][key]
+        hist = self._calculate_histogram(values, self._max_bins)
+        return self._score_hist(hist, float(np.mean(values)))
 
-        for atom in graph.nodes():
-            for shell in shells:
-                if shell in self._repository.charges_iacm:
-                    key = self._nauty.canonize_neighborhood(
-                            graph, atom, shell,
-                            color_key='iacm' if 'iacm' in graph.node[atom] else 'atom_type')
-                    if key in self._repository.charges_iacm[shell]:
-                        charges = self._repository.charges_iacm[shell][key]
-                        hist = self._calculate_histogram(charges, self._max_bins)
-                        histograms[atom] = self._score_hist(hist, float(np.mean(charges)))
-                        break
+    def _handle_error(
+            self,
+            no_vals: List[Atom], shells: List[int]
+            ) -> None:
+        """Raises an AssignmentError if no_vals is not empty.
 
-                if not iacm_data_only:
-                    if shell in self._repository.charges_elem:
-                        key = self._nauty.canonize_neighborhood(graph, atom, shell)
-                        if key in self._repository.charges_elem[shell]:
-                            charges = self._repository.charges_elem[shell][key]
-                            hist = self._calculate_histogram(charges, self._max_bins)
-                            histograms[atom] = self._score_hist(hist, float(np.mean(charges)))
-                            break
-            else:
-                no_vals.append(atom)
-        # collect charges from first shell size that gives a match, iacm if possible, elem otherwise unless disabled
-        # if no matches at any shell size, add to no_vals
+        Args:
+            no_vals: List of atoms for which no charges could be found.
+            shells: List of tried shell sizes.
 
+        Raises:
+            AssignmentError: If no_vals is not empty.
+        """
         if len(no_vals) > 0:
             err = 'Could not find charges for atoms {0}.'.format(', '.join(map(str, no_vals)))
             if not 0 in shells:
@@ -355,8 +313,6 @@ class HistogramCollector(Collector):
             else:
                 err += ' Please retry with a SimpleCharger.'
             raise AssignmentError(err)
-
-        return histograms
 
     def _calculate_histogram(
             self,
@@ -426,7 +382,8 @@ class HistogramCollector(Collector):
 
         return bin_centers, counts
 
-    def score_histogram_count(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_count(histogram: Tuple[ChargeList, WeightList],
             *args) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -440,7 +397,8 @@ class HistogramCollector(Collector):
         """
         return histogram
 
-    def score_histogram_log(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_log(histogram: Tuple[ChargeList, WeightList],
                             *args) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -456,7 +414,8 @@ class HistogramCollector(Collector):
         scores = list(map(log, counts))
         return bin_centers, scores
 
-    def score_histogram_martin(self, histogram: Tuple[ChargeList, WeightList],
+    @staticmethod
+    def score_histogram_martin(histogram: Tuple[ChargeList, WeightList],
             mean: float) -> Tuple[ChargeList, WeightList]:
         """Scores the counts of the charge histgram.
 
@@ -494,40 +453,88 @@ class ModeCollector(HistogramCollector):
             self,
             repository: Repository,
             rounding_digits: int,
-            nauty: Optional[Nauty] = None
+            nauty: Optional[Nauty] = None,
+            max_bins: Optional[int] = MAX_BINS
     ) -> None:
-        super().__init__(repository, rounding_digits, nauty, self.score_histogram_count)
+        super().__init__(repository, rounding_digits, nauty, HistogramCollector.score_histogram_count, max_bins)
 
-    def _calculate_histogram(
-            self,
-            charges: ChargeList,
-            max_bins: int
-            ) -> Tuple[ChargeList, WeightList]:
-        """Create a histogram and return its mode from a raw list of charges.
+    def _collect(self,
+                 chargeset: EitherChargeSet,
+                 shell_size: int,
+                 key: str
+                 ) -> Tuple[ChargeList, WeightList]:
+        """Collect charges for a single atom.
 
-        Histogram bins will be chosen so that:
-            - They are all equally wide
-            - Their centers fall on n-significant-digit numbers,
-                according to self.__rounding_digits
-            - Their widths are n-significant-digit numbers,
-                according to self.__rounding_digits
-            - There are at most max_bins non-zero bins
-            - The middle bin center is on the median charge, rounded to
-                an n-significant digit number.
-            - The bin size is as close to the size chosen by the Freedman-
-                Diaconis rule as it can be, given the above constraints.
-
-        If the histogram is multimodal, this function returns the mode
-        closest to the median.
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the mode of the charge values.
 
         Args:
-            charges: A list of charges to process into a histogram
-            max_bins: The maximum number of bins the histogram should have
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            A tuple of the containing the mode of the charges and the number of values that support it.
         """
-        bin_centers, counts = super()._calculate_histogram(charges, max_bins)
-        median_charge = median(charges)
+        values = chargeset[shell_size][key]
+        bin_centers, counts = self._calculate_histogram(values, self._max_bins)
+        median_charge = median(values)
 
         mode_charge, mode_count = max(zip(bin_centers, counts),
                                       key=lambda x: (x[1], -abs(median_charge - x[0])))
 
         return [mode_charge], [mode_count]
+
+
+class CachingCollector(Collector):
+    """A proxy collector that caches return values.
+
+    This collector caches the return values of it another collector. The CachingCollector \
+    can detect changes in the Repository of the other collector, if the Repository's \
+    versioning attribute is set to True.
+
+    Args:
+        basecollector: The collector to cache.
+    """
+    def __init__(
+            self,
+            basecollector: Collector):
+        super().__init__(basecollector._repository, basecollector._rounding_digits, basecollector._nauty)
+        self.__base = basecollector
+        self.__cache = dict()
+
+    def _collect(self,
+                 chargeset: EitherChargeSet,
+                 shell_size: int,
+                 key: str
+                 ) -> Tuple[ChargeList, WeightList]:
+        """Collect charges for a single atom.
+
+        Queries the given chargeset with the current shell_size (k) and key \
+        (hash of the atom's k-neighborhood graph) and returns \
+        the processed charge values.
+
+        Args:
+            chargeset: A dictonary index by shell_size and key that holds the charge values
+            shell_size: Shell size k
+            key: Hash of the atom's k-neighborhood
+
+        Returns:
+            The return value of the base collector.
+        """
+
+        cache_key = (id(chargeset), shell_size, key)
+        if isinstance(chargeset[shell_size][key], _VersioningList):
+            version = chargeset[shell_size][key].version
+        else:
+            version = None
+
+        if cache_key in self.__cache:
+            cache_version, values = self.__cache[cache_key]
+            if not version or version == cache_version:
+                return values
+
+        values = self.__base._collect(chargeset, shell_size, key)
+        self.__cache[cache_key] = (version, values)
+        return values

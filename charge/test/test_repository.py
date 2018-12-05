@@ -1,5 +1,3 @@
-import pytest
-
 from charge.repository import Repository
 
 def test_create_empty():

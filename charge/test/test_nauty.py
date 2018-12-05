@@ -1,8 +1,8 @@
-from pathlib import Path
-import pytest
 import stat
+from pathlib import Path
 
 from charge.nauty import Nauty
+
 
 def test_create():
     nauty = Nauty()

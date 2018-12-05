@@ -1,10 +1,10 @@
 import multiprocessing as mp
-import os
 import sys
 import traceback
 from typing import Any, Generator, List, Tuple, Type
 
 from charge.util import print_progress
+
 
 class _Stop:
     pass

@@ -1,8 +1,9 @@
-import networkx as nx
 from typing import Generator, Tuple
 
-from charge.nauty import  Nauty
+import networkx as nx
+
 from charge.charge_types import Atom
+from charge.nauty import Nauty
 
 
 def atoms_neighborhoods_charges(

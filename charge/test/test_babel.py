@@ -1,9 +1,8 @@
+import networkx.algorithms.isomorphism as nxiso
 import pytest
 
-import networkx as nx
-import networkx.algorithms.isomorphism as nxiso
-
 from charge.babel import convert_from, IOType, convert_to
+
 
 def equal_attributes(att1, att2):
      return att1 == att2

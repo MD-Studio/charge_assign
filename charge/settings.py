@@ -2,24 +2,49 @@
 
 import os
 
-for path in os.environ["PATH"].split(os.pathsep):
-    path = path.strip('"')
-    fpath = os.path.join(path, 'dreadnaut')
+NAUTY_EXC = None
+"""Location of the dreadnaut executable."""
+
+if 'NAUTY_EXC' in os.environ:
+    fpath = os.path.join(os.environ['NAUTY_EXC'], 'dreadnaut')
     if os.path.isfile(fpath) and os.access(fpath, os.X_OK):
         NAUTY_EXC = fpath
-        break
-else:
-    NAUTY_EXC = os.path.expanduser('~/workspace/nauty26r7/dreadnaut')
+
+if not NAUTY_EXC:
+    for path in os.environ["PATH"].split(os.pathsep):
+        path = path.strip('"')
+        fpath = os.path.join(path, 'dreadnaut')
+        if os.path.isfile(fpath) and os.access(fpath, os.X_OK):
+            NAUTY_EXC = fpath
+            break
+    else:
+        raise Exception('Could not find nauty executable.')
 
 ILP_SOLVER_MAX_SECONDS = 60
+"""Time limit for the ILP solver in seconds."""
+
 DEFAULT_TOTAL_CHARGE = 0
+"""Default target total charge."""
+
 DEFAULT_TOTAL_CHARGE_DIFF = 0.01
+"""Default allowed deviation from target total charge."""
+
 MAX_BINS = 25
+"""Maximal number of bins for the histogram calculations."""
 
 ROUNDING_DIGITS = 3
-MAX_ROUNDING_DIGITS = 9
+"""Default number of digits after the decimal point for the assigned charges."""
 
-REPO_LOCATION='atb_0_3.zip'
+MAX_ROUNDING_DIGITS = 9
+"""Maximal number of digits after the decimal point for the assigned charges."""
+
+REPO_LOCATION=None
+"""Default repository location."""
+
+if 'REPO_LOCATION' in os.environ:
+    fpath = os.environ['REPO_LOCATION']
+    if os.path.isfile(fpath) and os.access(fpath, os.R_OK):
+        REPO_LOCATION = fpath
 
 IACM_MAP = {
         'O': 'O', 'OM': 'O', 'OA': 'O', 'OE': 'O', 'OW': 'O', 'N': 'N',

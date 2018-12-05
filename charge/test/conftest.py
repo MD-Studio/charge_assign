@@ -1,11 +1,12 @@
 from collections import defaultdict
-import networkx as nx
-import os
 from pathlib import Path
+
+import networkx as nx
 import pytest
 
 from charge.bond_type import BondType
 from charge.nauty import Nauty
+
 
 # Fixtures for testing loading and saving to and from various
 # formats.
@@ -185,7 +186,6 @@ def ref_graph_rdkit(ref_graph_nodes, ref_graph_edges):
 
 @pytest.fixture
 def ref_graph_nodes_shifted(ref_graph_nodes):
-    from rdkit import Chem
     return [(v-1, data) for v, data in ref_graph_nodes]
 
 

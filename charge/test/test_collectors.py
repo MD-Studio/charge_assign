@@ -1,8 +1,8 @@
-from charge.collectors import AssignmentError, HistogramCollector, MeanCollector
-
 from math import log
-import networkx as nx
+
 import pytest
+
+from charge.collectors import AssignmentError, HistogramCollector, MeanCollector
 
 
 def test_mean_collector(ref_graph, mock_repository):

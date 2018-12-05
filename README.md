@@ -1,4 +1,5 @@
 # charge_assign
+[![DOI](https://zenodo.org/badge/103553886.svg)](https://zenodo.org/badge/latestdoi/103553886)
 
 ## Requirements
 
@@ -52,7 +53,8 @@ sudo yum install rdkit
 
 Installation instructions for nauty are available on the [Nauty
 homepage](http://pallini.di.uniroma1.it/). You will have to either add its
-directory to your PATH variable, or add the location of the dreadnaut program
+directory to your PATH variable, set the NAUTY_EXC environment variable to
+the directory, or add the location of the dreadnaut program
 to charge/settings.py.
 
 Next, we can make a virtual environment and install charge_assign and its
@@ -80,3 +82,21 @@ pytest --cov
 ```
 
 to run the test suite.
+
+## Documentation
+
+To build the documentation, you need to install sphinx first. Installing sphinx is easiest by using Anaconda.
+
+```
+conda install -n charge_assign sphinx sphinx_rtd_theme
+```
+
+Then run sphinx.
+
+```
+source activate charge_assign
+cd charge_assign/doc/
+make html
+```
+
+You can then find the documentation in `charge_assign/doc/build/html/`.

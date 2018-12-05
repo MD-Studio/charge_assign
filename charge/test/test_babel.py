@@ -20,6 +20,12 @@ def test_from_lgf(ref_graph_lgf, ref_graph):
     assert_same_graph(graph, ref_graph)
 
 
+def test_invalid_lgf():
+    invalid_lgf = 'This is not valid LGF'
+    with pytest.raises(ValueError):
+        graph = convert_from(invalid_lgf, IOType.LGF)
+
+
 def test_to_lgf(ref_graph, ref_graph_lgf):
     graph_lgf = convert_to(ref_graph, IOType.LGF)
     assert graph_lgf == ref_graph_lgf

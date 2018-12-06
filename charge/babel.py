@@ -54,12 +54,17 @@ def __lgf_to_nx(obj: str) -> nx.Graph:
     for line in map(lambda line: line.strip(), obj.splitlines()):
         if not line or len(line) == 0:
             continue
+        if line.startswith('#'):
+            continue
         if '@nodes' in line:
             nodes, edges, header = True, False, True
             continue
         if '@edges' in line:
             nodes, edges, header = False, True, True
             continue
+
+        if not (nodes or edges):
+            raise ValueError('Invalid line encountered: {}'.format(line))
 
         if nodes:
             if header:

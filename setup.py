@@ -5,7 +5,7 @@ dp_module = Extension('_dp',
 
 setup(
         name = 'charge_assign',
-        packages = ['charge'],
+        packages = ['charge', 'charge_server'],
         version = '0.0.1',
         description = 'Assigns charges to atoms in molecules by template matching',
         author = 'Martin Engler',
@@ -15,6 +15,8 @@ setup(
         license = 'Apache License 2.0',
         python_requires='>=3.5, <4',
         install_requires=[
+                'connexion',
+                'flask',
                 'msgpack-python>=0.4.8',
                 'networkx==2.0',
                 'numpy>=1.14.0,<2',
@@ -23,6 +25,7 @@ setup(
         ext_modules = [dp_module],
         extras_require={
             'dev': [
+                'flask_testing',
                 'pytest',
                 'pytest-pep8',
                 'pytest-cov',

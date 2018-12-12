@@ -213,10 +213,10 @@ class Repository:
         charges_elem = self.__generate_charges(graphs, 'atom_type', self.__traceable, self.__versioning)
 
         if with_iso:
-            canons = self.__make_canons(graphs)
-            iso_iacm = self.__make_isomorphics(molids, canons)
-            canons = self.__make_canons(graphs)
-            iso_elem = self.__make_isomorphics(molids, canons)
+            canons_iacm = self.__make_canons(graphs, 'iacm')
+            iso_iacm = self.__make_isomorphics(molids, canons_iacm)
+            canons_elem = self.__make_canons(graphs, 'atom_type')
+            iso_elem = self.__make_isomorphics(molids, canons_elem)
             return charges_iacm, charges_elem, iso_iacm, iso_elem
         else:
             return charges_iacm, charges_elem
@@ -351,11 +351,12 @@ class Repository:
 
     def __make_canons(
             self,
-            graphs: List[Tuple[int, nx.Graph]]
+            graphs: List[Tuple[int, nx.Graph]],
+            color_key: str
             ) -> Dict[int, str]:
         """Canonicalize the given graphs using Nauty."""
         canons = dict()
-        with MultiProcessor(_CanonicalizationWorker) as mp:
+        with MultiProcessor(_CanonicalizationWorker, color_key) as mp:
             for molid, canon in mp.processed(graphs):
                 canons[molid] = canon
         return canons
@@ -381,11 +382,12 @@ class _CanonicalizationWorker:
 
     Isomorphic graphs return the same hash (key).
     """
-    def __init__(self):
+    def __init__(self, color_key: str):
         self.__nauty = Nauty()
+        self.__color_key = color_key
 
     def process(self, molid: int, graph: nx.Graph) -> Tuple[int, str]:
-        return molid, self.__nauty.canonize(graph)
+        return molid, self.__nauty.canonize(graph, color_key=self.__color_key)
 
 
 class _ChargeWorker:

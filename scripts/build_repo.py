@@ -6,27 +6,30 @@ from typing import Tuple
 from charge.repository import Repository
 
 
-def get_args() -> Tuple[str, str]:
+def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
             description='Create a repository from a directory of LGF files.\n'
                         'This program reads molecule definitions from LGF'
                         ' files in a given directory, and processes them into'
                         ' a repository file for use with charge_assign.')
     parser.add_argument('-i', '--input', help='Path of the directory with input'
-                        ' files')
+                        ' files', required=True)
     parser.add_argument('-r', '--repository', help='Path to the repository file'
-                        ' to create')
+                        ' to create', required=True)
     parser.add_argument('-m', '--max-shell', type=int, default=3,
                         help='Maximum shell size to use')
+    parser.add_argument('-t', '--traceable', help='Generate a traceable'
+                        ' repository', action='store_true')
     args = parser.parse_args()
-    return args.input, args.repository, args.max_shell
+    return args
 
 
 def main() -> None:
-    source_dir, repo_file, max_shell = get_args()
+    args = get_args()
 
-    repo = Repository.create_from(source_dir, max_shell=max_shell)
-    repo.write(repo_file)
+    repo = Repository.create_from(args.input, max_shell=args.max_shell,
+                                  traceable=args.traceable)
+    repo.write(args.repository)
 
 
 if __name__ == '__main__':

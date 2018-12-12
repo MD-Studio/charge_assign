@@ -23,6 +23,7 @@ setup(
                 'pulp>=1.6.8'
             ],
         ext_modules = [dp_module],
+        scripts = ['scripts/build_repo.py'],
         extras_require={
             'dev': [
                 'flask_testing',

@@ -374,6 +374,10 @@ class _ReadWorker:
                 self.__data_location, '%d%s' % (molid, self.__extension))
         with open(filename, 'r') as f:
             graph = convert_from(f.read(), self.__data_type)
+            if graph.number_of_nodes() == 0:
+                raise RuntimeError('Molecule with molid {} read from file {}'
+                                   ' has no atoms! Is this file valid?'.format(
+                                       molid, filename))
             return molid, graph
 
 

@@ -16,14 +16,16 @@ def get_args() -> Tuple[str, str]:
                         ' files')
     parser.add_argument('-r', '--repository', help='Path to the repository file'
                         ' to create')
+    parser.add_argument('-m', '--max-shell', type=int, default=3,
+                        help='Maximum shell size to use')
     args = parser.parse_args()
-    return args.input, args.repository
+    return args.input, args.repository, args.max_shell
 
 
 def main() -> None:
-    source_dir, repo_file = get_args()
+    source_dir, repo_file, max_shell = get_args()
 
-    repo = Repository.create_from(source_dir)
+    repo = Repository.create_from(source_dir, max_shell=max_shell)
     repo.write(repo_file)
 
 

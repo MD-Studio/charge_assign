@@ -14,6 +14,7 @@ class _Error:
     def __init__(self, message: str):
         self.exception_message = message
 
+
 class _Ready:
     pass
 
@@ -89,6 +90,9 @@ class MultiProcessor:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.shutdown()
 
+    def __del__(self) -> None:
+        self.shutdown()
+
 
     def processed(self, items: List, progress_label: str=None) -> Generator:
         """
@@ -152,7 +156,7 @@ class MultiProcessor:
         try:
             processor = processor_class(*proc_init_arguments)
             out_queue.put(_Ready())
-        except BaseException as e:
+        except:
             message = ''.join(traceback.format_exception(*sys.exc_info()))
             out_queue.put(_Error(message))
             sys.exit()
@@ -164,7 +168,7 @@ class MultiProcessor:
             try:
                 result = processor.process(*arguments)
                 out_queue.put(result)
-            except BaseException as e:
+            except:
                 message = ''.join(traceback.format_exception(*sys.exc_info()))
                 out_queue.put(_Error(message))
 

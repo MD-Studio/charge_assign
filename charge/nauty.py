@@ -51,6 +51,11 @@ class Nauty:
         except AttributeError:
             # It seems that it's possible somehow for __process to not exist
             pass
+        except TypeError:
+            # Looks like we have different threads deleting simultaneously?
+            # At any rate it seems that self.__process can be None in the
+            # wait() call.
+            pass
 
     def canonize_neighborhood(self, graph: nx.Graph, core: Any, shell: int, color_key='atom_type') -> str:
         """Calculate a canonical key for a neighborhood of an atom.

@@ -345,7 +345,7 @@ class HistogramCollector(Collector):
         # calc F-D width
         iqr = third_quartile(charges) - first_quartile(charges)
         fd_width = 2.0 * iqr / (len(charges)**(1./3))
-        if fd_width == 0.0:
+        if fd_width < grain:
             fd_width = grain
 
         median_charge = round_to(median(charges), grain)

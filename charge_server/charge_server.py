@@ -53,4 +53,4 @@ def charge(graph: nx.Graph, total_charge: int) -> None:
         total_charge: The total charge to solve for.
     """
     global _charger
-    _charger.charge(graph, total_charge, True, False, range(20, -1, -1))
+    _charger.charge(graph, total_charge)

@@ -21,6 +21,7 @@ RUN bash -c ' \
 USER root
 COPY charge /home/charge_assign/charge
 COPY charge_server /home/charge_assign/charge_server
+COPY scripts /home/charge_assign/scripts
 COPY setup.py /home/charge_assign/setup.py
 COPY setup.cfg /home/charge_assign/setup.cfg
 RUN find /home/charge_assign/charge /home/charge_assign/charge_server -name '__pycache__' -depth -exec rm -r \{\} \;

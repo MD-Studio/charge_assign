@@ -1,6 +1,6 @@
 import pytest
 
-from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver
+from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver, SymmetricILPSolver
 
 
 def test_simple_solver(ref_graph):
@@ -61,6 +61,35 @@ def test_ilp_solver(ref_graph):
     assert ref_graph.graph['time'] < 0.1
     assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
     assert ref_graph.graph['score'] == pytest.approx(3.7)
+
+def test_symmetricilp_solver(ref_graph):
+    solver = SymmetricILPSolver(2)
+    charge_dists = {
+            1: ([-0.62, -0.52, -0.42], [0.25, 0.5, 0.25]),
+            2: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25]),
+            3: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25]),
+            4: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25]),
+            5: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25])
+            }
+    solver.solve_partial_charges(
+            ref_graph,
+            charge_dists,
+            0)
+
+    assert ref_graph.node[1]['partial_charge'] == -0.52
+    assert ref_graph.node[1]['score'] == 0.5
+    assert ref_graph.node[2]['partial_charge'] == 0.13
+    assert ref_graph.node[2]['score'] == 0.25
+    assert ref_graph.node[3]['partial_charge'] == 0.13
+    assert ref_graph.node[3]['score'] == 0.25
+    assert ref_graph.node[4]['partial_charge'] == 0.13
+    assert ref_graph.node[4]['score'] == 0.25
+    assert ref_graph.node[5]['partial_charge'] == 0.13
+    assert ref_graph.node[5]['score'] == 0.25
+
+    assert ref_graph.graph['time'] < 0.1
+    assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
+    assert ref_graph.graph['score'] == pytest.approx(1.5)
 
 
 def test_dp_solver(ref_graph):

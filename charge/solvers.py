@@ -1,7 +1,7 @@
 import itertools
 from abc import ABC, abstractmethod
 from time import perf_counter
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
@@ -10,6 +10,7 @@ from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, 
 from charge.charge_types import Atom, ChargeList, WeightList
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
 from charge.util import AssignmentError
+from charge.nauty import Nauty
 
 
 class Solver(ABC):
@@ -226,7 +227,8 @@ class SymmetricILPSolver(Solver):
 
     def __init__(self,
                  rounding_digits: int=ROUNDING_DIGITS,
-                 max_seconds: int=ILP_SOLVER_MAX_SECONDS
+                 max_seconds: int=ILP_SOLVER_MAX_SECONDS,
+                 nauty: Optional[Nauty]=None
                  ) -> None:
         """Create an ILPSolver.
 
@@ -236,6 +238,7 @@ class SymmetricILPSolver(Solver):
                     solution
         """
         self.__rounding_digits = rounding_digits
+        self._nauty = nauty if nauty is not None else Nauty()
 
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)

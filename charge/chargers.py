@@ -305,7 +305,7 @@ class SymmetricILPCharger(Charger):
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         if caching:
             self._collector = CachingCollector(self._collector)
-        self._solver = SymmetricILPSolver(rounding_digits, max_seconds)
+        self._solver = SymmetricILPSolver(rounding_digits, max_seconds, self._nauty)
 
 
 class DPCharger(Charger):

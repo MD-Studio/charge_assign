@@ -287,6 +287,10 @@ class SymmetricILPSolver(Solver):
         weights = dict()
         # profits = frequencies
         profits = dict()
+
+        # nauty hashes of k-neighborhoods for each atom
+        keydict = dict()
+
         pos_total = total_charge
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
@@ -294,6 +298,16 @@ class SymmetricILPSolver(Solver):
             weights[k] = charges
             profits[k] = frequencies
             pos_total -= min(charges)
+
+        # compute k-neighborhood-hash values for each atom of the molecule (like method collect_values from the collectors)
+        for atom in graph.nodes():
+            shellsize = 3       # TODO replace with actual shellsize of charger.charge() Method
+            atom_has_iacm = 'iacm' in graph.node[atom]
+
+            if atom_has_iacm:
+                keydict[atom] = self._nauty.canonize_neighborhood(graph, atom, shellsize, 'iacm')
+            else:
+                self._nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
 
         x = LpVariable.dicts('x', itertools.chain.from_iterable(idx), lowBound=0, upBound=1, cat=LpInteger)
 
@@ -313,6 +327,13 @@ class SymmetricILPSolver(Solver):
         charging_problem +=\
             sum([weights[k][i] * x[(k, i)] for k, i in itertools.chain.from_iterable(idx)]) - total_charge\
             >= -total_charge_diff
+
+        #identical neighborhood charge conditions
+        for i,j in itertools.combinations(atom_idx, 2):
+            if(keydict.get(atom_idx.get(i)) == keydict.get(atom_idx.get(j))):       # if atoms i and j have identical neighborhoods
+                for (_, k) in idx[i]:
+                    charging_problem += x[(i, k)] - x[(j, k)] == 0                  # weight k from atom i is selected as partial charge <=> weight k of atom j is selected as partial charge
+
 
         solutionTime = -perf_counter()
         try:

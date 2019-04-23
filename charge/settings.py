@@ -29,6 +29,9 @@ DEFAULT_TOTAL_CHARGE = 0
 DEFAULT_TOTAL_CHARGE_DIFF = 0.01
 """Default allowed deviation from target total charge."""
 
+DEFAULT_SHELL_SIZE = [3,2,1,0]
+"""Default Shells which Symmetric ILP Solver uses"""
+
 MAX_BINS = 25
 """Maximal number of bins for the histogram calculations."""
 

@@ -1,14 +1,14 @@
 import itertools
 from abc import ABC, abstractmethod
 from time import perf_counter
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
 from charge.charge_types import Atom, ChargeList, WeightList
-from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
+from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS, DEFAULT_SHELL_SIZE
 from charge.util import AssignmentError
 from charge.nauty import Nauty
 
@@ -260,6 +260,7 @@ class SymmetricILPSolver(Solver):
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            shells: List[int]=DEFAULT_SHELL_SIZE,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -301,7 +302,7 @@ class SymmetricILPSolver(Solver):
 
         # compute k-neighborhood-hash values for each atom of the molecule (like method collect_values from the collectors)
         for atom in graph.nodes():
-            shellsize = 3       # TODO replace with actual shellsize of charger.charge() Method
+            shellsize = shells[0]
             atom_has_iacm = 'iacm' in graph.node[atom]
 
             if atom_has_iacm:

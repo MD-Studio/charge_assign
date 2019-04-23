@@ -74,7 +74,8 @@ def test_symmetricilp_solver(ref_graph):
     solver.solve_partial_charges(
             ref_graph,
             charge_dists,
-            0)
+            0,
+            shells=[2, 1, 0])
 
     assert ref_graph.node[1]['partial_charge'] == -0.52
     assert ref_graph.node[1]['score'] == 0.5

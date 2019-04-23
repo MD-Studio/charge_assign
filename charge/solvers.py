@@ -308,7 +308,7 @@ class SymmetricILPSolver(Solver):
             if atom_has_iacm:
                 keydict[atom] = self._nauty.canonize_neighborhood(graph, atom, shellsize, 'iacm')
             else:
-                self._nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
+                keydict[atom] = self._nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
 
         x = LpVariable.dicts('x', itertools.chain.from_iterable(idx), lowBound=0, upBound=1, cat=LpInteger)
 

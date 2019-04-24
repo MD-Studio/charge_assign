@@ -491,6 +491,131 @@ class DPSolver(Solver):
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
 
+class SymmetricDPSolver(Solver):
+    """An optimizing solver using Dynamic Programming.
+
+    Use the HistogramCollector to produce appropriate charge \
+    distributions.
+    """
+    def __init__(self, rounding_digits) -> None:
+        """Create a DPSolver.
+
+        Args:
+            rounding_digits: How many significant digits to round the \
+                    resulting charges to.
+        """
+        self.__rounding_digits = rounding_digits
+
+
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
+
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
+
+        This solver uses Dynamic Programming to solve the \
+        epsilon-Multiple Choice Knapsack Problem. This is the Python \
+        version of the algorithm, see CDPSolver for a faster \
+        implementation.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+        """
+
+        blowup = 10 ** self.__rounding_digits
+        deflate = 10 ** (-self.__rounding_digits)
+
+        atom_idx = dict()
+        idx = list()
+        # item = (index, weight, profit)
+        items = list()
+        # min weights
+        w_min = dict()
+
+        solutionTime = -perf_counter()
+
+        # transform weights to non-negative integers
+        pos_total_charge = total_charge
+        max_sum = 0
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+            atom_idx[k] = atom
+            idx.append(zip(itertools.repeat(k), range(len(charges))))
+            w_min[k] = min(charges)
+            max_sum += max(charges) - w_min[k]
+            items.append(list(zip(range(len(charges)),
+                             [round(blowup * (charge - w_min[k])) for charge in charges],
+                             frequencies)))
+            pos_total_charge -= w_min[k]
+
+        # lower and upper capacity limits
+        upper = round(blowup * (pos_total_charge + total_charge_diff))
+        lower = max(0, round(blowup * (pos_total_charge - total_charge_diff)))
+
+        # check if feasible solutions may exist
+        reachable = round(blowup * max_sum)
+        if upper < 0 or lower > reachable:
+            # sum of min weights over all sets is larger than the upper bound
+            # or sum of max weights over all sets is smaller than the lower bound
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                                  ' with a SimpleCharger')
+
+        # init DP and traceback tables
+        dp = [0] + [-float('inf')] * upper
+        tb = [[] for _ in range(upper + 1)]
+
+        # DP
+        # iterate over all sets
+        for items_l in items:
+            # iterate over all capacities
+            for d in range(upper, -1, -1):
+                try:
+                    # find max. profit with capacity i over all items j in set k
+                    idx, dp[d] = max(
+                        ((item[0], dp[d - item[1]] + item[2]) for item in items_l if d - item[1] >= 0),
+                        key=lambda x: x[1]
+                    )
+                    # copy old traceback indices and add new index to traceback
+                    if dp[d] >= 0:
+                        tb[d] = tb[d - items_l[idx][1]] + [idx]
+                except ValueError:
+                    dp[d] = -float('inf')
+
+        # find max profit
+        max_pos, max_val = max(enumerate(dp[lower:upper + 1]), key=lambda x: x[1])
+
+        solutionTime += perf_counter()
+
+        if max_val == -float('inf'):
+            raise AssignmentError('Could not solve DP problem. Please retry'
+                    ' with a SimpleCharger')
+
+        solution = tb[lower + max_pos]
+
+        charge = 0
+        for i, j in enumerate(solution):
+            graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
+                                                              self.__rounding_digits)
+            graph.node[atom_idx[i]]['score'] = items[i][j][2]
+            charge += graph.node[atom_idx[i]]['partial_charge']
+
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
+        graph.graph['score'] = max_val
+        graph.graph['time'] = solutionTime
+        graph.graph['items'] = sum(len(i) for i in items)
+        graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
+
 
 class CDPSolver(Solver):
     """An optimizing solver using Dynamic Programming, C version.

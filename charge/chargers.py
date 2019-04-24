@@ -11,7 +11,7 @@ from charge.collectors import HistogramCollector, MeanCollector, ModeCollector, 
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS, ILP_SOLVER_MAX_SECONDS
-from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver, SymmetricILPSolver
+from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver, SymmetricILPSolver, SymmetricDPSolver
 
 
 class Charger(ABC):
@@ -345,6 +345,44 @@ class DPCharger(Charger):
         if caching:
             self._collector = CachingCollector(self._collector)
         self._solver = DPSolver(rounding_digits)
+
+class SymmetricDPCharger(Charger):
+    """A charger that uses Dynamic Programming, Python version.
+
+    This charger calculates an optimal charge distribution given the \
+    charges found in a repository, using Dynamic Programming. The C \
+    implementation in CDPCharger does the same, but runs faster.
+    """
+    def __init__(
+            self,
+            repository: Repository,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int] = MAX_BINS
+            ) -> None:
+        """Create an DPCharger.
+
+        Nauty instances manage an external process, so they're \
+        somewhat expensive to create. If you have multiple chargers, \
+        you could consider sharing one between them.
+
+        Args:
+            repository: The repository to get charges from
+            rounding_digits: Number of digits to round charges to
+            nauty: An external Nauty instance to use
+            caching: Cache collected charges
+            scoring: A scoring function for the histogram. See \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
+        """
+        super().__init__(repository, rounding_digits, nauty)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
+        self._solver = SymmetricDPSolver(rounding_digits)
 
 
 class CDPCharger(Charger):

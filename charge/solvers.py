@@ -516,6 +516,7 @@ class SymmetricDPSolver(Solver):
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            shells: List[int] = DEFAULT_SHELL_SIZE,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.

@@ -497,7 +497,9 @@ class SymmetricDPSolver(Solver):
     Use the HistogramCollector to produce appropriate charge \
     distributions.
     """
-    def __init__(self, rounding_digits) -> None:
+    def __init__(self,
+                 rounding_digits,
+                 nauty: Optional[Nauty]=None) -> None:
         """Create a DPSolver.
 
         Args:
@@ -505,6 +507,7 @@ class SymmetricDPSolver(Solver):
                     resulting charges to.
         """
         self.__rounding_digits = rounding_digits
+        self._nauty = nauty if nauty is not None else Nauty()
 
 
     def solve_partial_charges(

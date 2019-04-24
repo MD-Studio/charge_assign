@@ -382,7 +382,7 @@ class SymmetricDPCharger(Charger):
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         if caching:
             self._collector = CachingCollector(self._collector)
-        self._solver = SymmetricDPSolver(rounding_digits)
+        self._solver = SymmetricDPSolver(rounding_digits, self._nauty)
 
 
 class CDPCharger(Charger):

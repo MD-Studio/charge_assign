@@ -42,6 +42,34 @@ class Solver(ABC):
         """
         pass
 
+    def compute_neighborhood_canonical_key_dict(
+            self,
+            graph: nx.Graph,
+            shells: List[int],
+            nauty: Nauty) -> dict():
+
+        """Calculates a nauty canonical key for the neighborhood of each atom.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            shells: Shell sizes to use. uses first shellsize
+            nauty: A nauty instance
+
+        """
+
+        keydict = dict()
+
+        for atom in graph.nodes():
+            shellsize = shells[0]
+            atom_has_iacm = 'iacm' in graph.node[atom]
+
+            if atom_has_iacm:
+                keydict[atom] = nauty.canonize_neighborhood(graph, atom, shellsize, 'iacm')
+            else:
+                keydict[atom] = nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
+
+        return keydict
+
 
 class SimpleSolver(Solver):
     """A trivial solver that assigns a single statistics of the found charges.
@@ -300,15 +328,8 @@ class SymmetricILPSolver(Solver):
             profits[k] = frequencies
             pos_total -= min(charges)
 
-        # compute k-neighborhood-hash values for each atom of the molecule (like method collect_values from the collectors)
-        for atom in graph.nodes():
-            shellsize = shells[0]
-            atom_has_iacm = 'iacm' in graph.node[atom]
-
-            if atom_has_iacm:
-                keydict[atom] = self._nauty.canonize_neighborhood(graph, atom, shellsize, 'iacm')
-            else:
-                keydict[atom] = self._nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
+        # compute k-neighborhood-canonical key for each atom of the molecule
+        keydict = self.compute_neighborhood_canonical_key_dict(graph, shells, self._nauty)
 
         x = LpVariable.dicts('x', itertools.chain.from_iterable(idx), lowBound=0, upBound=1, cat=LpInteger)
 

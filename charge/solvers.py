@@ -352,7 +352,7 @@ class SymmetricILPSolver(Solver):
 
         #identical neighborhood charge conditions
         for i,j in itertools.combinations(atom_idx, 2):
-            if(keydict.get(atom_idx.get(i)) == keydict.get(atom_idx.get(j))):       # if atoms i and j have identical neighborhoods
+            if(keydict[atom_idx[i]] == keydict[atom_idx[j]]):       # if atoms i and j have identical neighborhoods
                 for (_, k) in idx[i]:
                     charging_problem += x[(i, k)] - x[(j, k)] == 0                  # weight k from atom i is selected as partial charge <=> weight k of atom j is selected as partial charge
 

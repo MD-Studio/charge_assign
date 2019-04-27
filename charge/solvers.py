@@ -70,6 +70,21 @@ class Solver(ABC):
 
         return keydict
 
+    def compute_atom_neighborhood_classes(self, atom_idx : dict, keydict : dict):
+        L = list()
+        atoms = list(atom_idx)
+
+        while(len(atoms) > 0):
+            i = atoms[0]
+            l = list([i])
+            for j in atoms[1::]:
+                if (keydict[atom_idx[i]] == keydict[atom_idx[j]]):  # if atoms i and j have identical neighborhoods
+                    l.append(j)
+            L.append(l)
+            for j in l:
+                atoms.remove(j)
+        return L
+
 
 class SimpleSolver(Solver):
     """A trivial solver that assigns a single statistics of the found charges.
@@ -351,8 +366,9 @@ class SymmetricILPSolver(Solver):
             >= -total_charge_diff
 
         #identical neighborhood charge conditions
-        for i,j in itertools.combinations(atom_idx, 2):
-            if(keydict[atom_idx[i]] == keydict[atom_idx[j]]):       # if atoms i and j have identical neighborhoods
+        for neighborhood_class in self.compute_atom_neighborhood_classes(atom_idx, keydict):
+            i = neighborhood_class[0]
+            for j in neighborhood_class[1::]:
                 for (_, k) in idx[i]:
                     charging_problem += x[(i, k)] - x[(j, k)] == 0                  # weight k from atom i is selected as partial charge <=> weight k of atom j is selected as partial charge
 

@@ -180,3 +180,14 @@ def test_cdp_solver(ref_graph):
     assert ref_graph.graph['time'] < 0.1
     assert ref_graph.graph['total_charge'] == pytest.approx(0.0)
     assert ref_graph.graph['score'] == pytest.approx(3.7)
+
+def test_atom_neighborhood_class():
+    solver = SimpleSolver(2)
+    atom_idx = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5:6, 6:7}
+    keydict = {1: 'A', 2: 'B', 3: 'B', 4: 'B', 5: 'B', 6: 'C', 7: 'C'}
+
+    classes = solver.compute_atom_neighborhood_classes(atom_idx, keydict)
+
+    assert classes[0] == [0]
+    assert classes[1] == [1, 2, 3, 4]
+    assert classes[2] == [5, 6]

@@ -550,7 +550,7 @@ class SymmetricDPSolver(Solver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
             shells: List[int] = DEFAULT_SHELL_SIZE,
@@ -576,18 +576,20 @@ class SymmetricDPSolver(Solver):
         """
 
         blowup = 10 ** self.__rounding_digits
-        deflate = 10 ** (-self.__rounding_digits)
 
-        atom_idx, items, w_min, pos_total_charge, max_sum = self.transform_weights(charge_dists, total_charge, blowup)
+        # reduce charge distributions (charges and frequencies of atoms within one neighborhoodclass get combined)
+        charge_dists_reduced, atom_idx, neighborhoodclasses = self.reduce_charge_distributions(graph, charge_dists_collector, shells)
+
+        items, pos_total_charge, max_sum = self.transform_weights(charge_dists_reduced, total_charge, blowup)
 
         solution, max_val, solutionTime = self.solve_dp(items, total_charge_diff, pos_total_charge, max_sum, blowup)
 
         charge = 0
         for i, j in enumerate(solution):
-            graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
-                                                              self.__rounding_digits)
-            graph.node[atom_idx[i]]['score'] = items[i][j][2]
-            charge += graph.node[atom_idx[i]]['partial_charge']
+            for k in neighborhoodclasses[i]:
+                graph.node[atom_idx[k]]['partial_charge'] = charge_dists_collector[atom_idx[k]][0][j]
+                graph.node[atom_idx[k]]['score'] = charge_dists_collector[atom_idx[k]][1][j]
+                charge += graph.node[atom_idx[k]]['partial_charge']
 
         graph.graph['total_charge'] = round(charge, self.__rounding_digits)
         graph.graph['score'] = max_val
@@ -614,7 +616,7 @@ class SymmetricDPSolver(Solver):
                                   frequencies)))
             pos_total_charge -= w_min[k]
 
-        return atom_idx, items, w_min, pos_total_charge, max_sum
+        return items, pos_total_charge, max_sum
 
 
     def solve_dp(self, items, total_charge_diff, pos_total_charge, max_sum, blowup):
@@ -666,6 +668,26 @@ class SymmetricDPSolver(Solver):
         solution = tb[lower + max_pos]
 
         return solution, max_val, solutionTime
+
+    def reduce_charge_distributions(self, graph, charge_dists_collector, shells):
+        atom_idx = dict()
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists_collector.items()):
+            atom_idx[k] = atom
+        keydict = self.compute_neighborhood_canonical_key_dict(graph, shells, self._nauty)
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+
+        charge_dists = dict()
+        for neighborhoodclass in neighborhoodclasses:
+            i = neighborhoodclass[0]
+            charge_dists[atom_idx[i]] = charge_dists_collector[atom_idx[i]]
+            for j in neighborhoodclass[1::]:
+                #Add the charges and frequencies of Atom j to those of atom i
+                charges = [round(sum(x),self.__rounding_digits) for x in zip(charge_dists[atom_idx[i]][0], charge_dists_collector[atom_idx[j]][0])]
+                frequencies = [round(sum(x),self.__rounding_digits) for x in zip(charge_dists[atom_idx[i]][1], charge_dists_collector[atom_idx[j]][1])]
+
+                charge_dists[atom_idx[i]] = (charges,frequencies)
+
+        return charge_dists, atom_idx, neighborhoodclasses
 
 
 class CDPSolver(Solver):

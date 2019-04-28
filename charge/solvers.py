@@ -578,7 +578,9 @@ class SymmetricDPSolver(Solver):
         blowup = 10 ** self.__rounding_digits
         deflate = 10 ** (-self.__rounding_digits)
 
-        solution, atom_idx, items, max_val, w_min, solutionTime, pos_total_charge = self.solve_dp(charge_dists, total_charge, total_charge, blowup)
+        atom_idx, idx, items, w_min, pos_total_charge, max_sum = self.transform_weights(charge_dists, total_charge, blowup)
+
+        solution, max_val, solutionTime = self.solve_dp(items, total_charge_diff, pos_total_charge, max_sum, blowup)
 
         charge = 0
         for i, j in enumerate(solution):
@@ -593,15 +595,13 @@ class SymmetricDPSolver(Solver):
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
 
-    def solve_dp(self, charge_dists, total_charge, total_charge_diff, blowup):
+    def transform_weights(self, charge_dists, total_charge, blowup):
         atom_idx = dict()
         idx = list()
         # item = (index, weight, profit)
         items = list()
         # min weights
         w_min = dict()
-
-        solutionTime = -perf_counter()
 
         # transform weights to non-negative integers
         pos_total_charge = total_charge
@@ -616,6 +616,13 @@ class SymmetricDPSolver(Solver):
                                   frequencies)))
             pos_total_charge -= w_min[k]
 
+        return atom_idx, idx, items, w_min, pos_total_charge, max_sum
+
+
+    def solve_dp(self, items, total_charge_diff, pos_total_charge, max_sum, blowup):
+
+
+        solutionTime = -perf_counter()
         # lower and upper capacity limits
         upper = round(blowup * (pos_total_charge + total_charge_diff))
         lower = max(0, round(blowup * (pos_total_charge - total_charge_diff)))
@@ -660,7 +667,7 @@ class SymmetricDPSolver(Solver):
 
         solution = tb[lower + max_pos]
 
-        return solution, atom_idx, items, max_val, w_min, solutionTime, pos_total_charge
+        return solution, max_val, solutionTime
 
 
 class CDPSolver(Solver):

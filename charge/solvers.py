@@ -578,7 +578,7 @@ class SymmetricDPSolver(Solver):
         blowup = 10 ** self.__rounding_digits
         deflate = 10 ** (-self.__rounding_digits)
 
-        atom_idx, idx, items, w_min, pos_total_charge, max_sum = self.transform_weights(charge_dists, total_charge, blowup)
+        atom_idx, items, w_min, pos_total_charge, max_sum = self.transform_weights(charge_dists, total_charge, blowup)
 
         solution, max_val, solutionTime = self.solve_dp(items, total_charge_diff, pos_total_charge, max_sum, blowup)
 
@@ -597,7 +597,6 @@ class SymmetricDPSolver(Solver):
 
     def transform_weights(self, charge_dists, total_charge, blowup):
         atom_idx = dict()
-        idx = list()
         # item = (index, weight, profit)
         items = list()
         # min weights
@@ -608,7 +607,6 @@ class SymmetricDPSolver(Solver):
         max_sum = 0
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
-            idx.append(zip(itertools.repeat(k), range(len(charges))))
             w_min[k] = min(charges)
             max_sum += max(charges) - w_min[k]
             items.append(list(zip(range(len(charges)),
@@ -616,7 +614,7 @@ class SymmetricDPSolver(Solver):
                                   frequencies)))
             pos_total_charge -= w_min[k]
 
-        return atom_idx, idx, items, w_min, pos_total_charge, max_sum
+        return atom_idx, items, w_min, pos_total_charge, max_sum
 
 
     def solve_dp(self, items, total_charge_diff, pos_total_charge, max_sum, blowup):

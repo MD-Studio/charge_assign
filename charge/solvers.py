@@ -578,6 +578,22 @@ class SymmetricDPSolver(Solver):
         blowup = 10 ** self.__rounding_digits
         deflate = 10 ** (-self.__rounding_digits)
 
+        solution, atom_idx, items, max_val, w_min, solutionTime, pos_total_charge = self.solve_dp(charge_dists, total_charge, total_charge, blowup)
+
+        charge = 0
+        for i, j in enumerate(solution):
+            graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
+                                                              self.__rounding_digits)
+            graph.node[atom_idx[i]]['score'] = items[i][j][2]
+            charge += graph.node[atom_idx[i]]['partial_charge']
+
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
+        graph.graph['score'] = max_val
+        graph.graph['time'] = solutionTime
+        graph.graph['items'] = sum(len(i) for i in items)
+        graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
+
+    def solve_dp(self, charge_dists, total_charge, total_charge_diff, blowup):
         atom_idx = dict()
         idx = list()
         # item = (index, weight, profit)
@@ -596,8 +612,8 @@ class SymmetricDPSolver(Solver):
             w_min[k] = min(charges)
             max_sum += max(charges) - w_min[k]
             items.append(list(zip(range(len(charges)),
-                             [round(blowup * (charge - w_min[k])) for charge in charges],
-                             frequencies)))
+                                  [round(blowup * (charge - w_min[k])) for charge in charges],
+                                  frequencies)))
             pos_total_charge -= w_min[k]
 
         # lower and upper capacity limits
@@ -640,22 +656,11 @@ class SymmetricDPSolver(Solver):
 
         if max_val == -float('inf'):
             raise AssignmentError('Could not solve DP problem. Please retry'
-                    ' with a SimpleCharger')
+                                  ' with a SimpleCharger')
 
         solution = tb[lower + max_pos]
 
-        charge = 0
-        for i, j in enumerate(solution):
-            graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
-                                                              self.__rounding_digits)
-            graph.node[atom_idx[i]]['score'] = items[i][j][2]
-            charge += graph.node[atom_idx[i]]['partial_charge']
-
-        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
-        graph.graph['score'] = max_val
-        graph.graph['time'] = solutionTime
-        graph.graph['items'] = sum(len(i) for i in items)
-        graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
+        return solution, atom_idx, items, max_val, w_min, solutionTime, pos_total_charge
 
 
 class CDPSolver(Solver):

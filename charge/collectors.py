@@ -68,6 +68,8 @@ class Collector(ABC):
             A dictionary mapping atoms (nodes) in graph to a tuple of \
                     lists, the first with charges, the second with \
                     weights.
+            A dictionary mapping atoms (nodes) in a graph to a unique string \
+                    which represents the neighborhood of the atom
         """
         charges = dict()
         no_vals = list()

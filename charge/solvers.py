@@ -39,6 +39,9 @@ class Solver(ABC):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph \
+                    only used in Symmetric Solvers
         """
         pass
 
@@ -171,7 +174,8 @@ class ILPSolver(Solver):
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
-            total_charge: The total charge of the molecule.
+            total_charge: The total charge of the molecule
+            total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         atom_idx = dict()
@@ -296,6 +300,9 @@ class SymmetricILPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph
+            total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         atom_idx = dict()
@@ -412,6 +419,7 @@ class DPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         blowup = 10 ** self.__rounding_digits
@@ -536,9 +544,12 @@ class SymmetricDPSolver(Solver):
 
         Args:
             graph: The molecule graph to solve charges for.
-            charge_dists: Charge distributions for the atoms, obtained \
+            charge_dists_collector: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph
+            total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         blowup = 10 ** self.__rounding_digits
@@ -697,6 +708,7 @@ class CDPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         import charge.c.dp as dp

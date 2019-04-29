@@ -8,7 +8,7 @@ from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, 
     GLPK_CMD, COIN_CMD
 
 from charge.charge_types import Atom, ChargeList, WeightList
-from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS, DEFAULT_SHELL_SIZE
+from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
 from charge.util import AssignmentError
 
 

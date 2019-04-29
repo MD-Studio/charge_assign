@@ -191,3 +191,24 @@ def test_atom_neighborhood_class():
     assert classes[0] == [0]
     assert classes[1] == [1, 2, 3, 4]
     assert classes[2] == [5, 6]
+
+def test_reduce_charge_dists():
+    solver = SymmetricDPSolver(2)
+    atom_idx = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7}
+    neighborhoodclasses = [[0], [1, 2, 3, 4], [5, 6]]
+
+    charge_dists_collector = {1: ([1, 2], [0.5, 0.7]),
+                              2: ([1, 2, 3], [0.1, 0.2, 0.3]),
+                              3: ([1, 2, 3], [0.1, 0.2, 0.3]),
+                              4: ([1, 2, 3], [0.1, 0.2, 0.3]),
+                              5: ([1, 2, 3], [0.1, 0.2, 0.3]),
+                              6: ([6, 5, 4, 3], [0.15, 0.15, 0.15, 0.15]),
+                              7: ([6, 5, 4, 3], [0.15, 0.15, 0.15, 0.15])
+                              }
+    charge_dists_reduced_expected =     {1: ([1, 2], [0.5, 0.7]),
+                                         2: ([1 * 4, 2 * 4, 3 * 4], [0.1 * 4, 0.2 * 4, 0.3 * 4]),
+                                         6: ([6 * 2, 5 * 2, 4 * 2, 3 * 2], [0.15 * 2, 0.15 * 2, 0.15 * 2, 0.15 * 2])
+                                         }
+    charge_dists_reduced_actual = solver.reduce_charge_distributions(charge_dists_collector, atom_idx, neighborhoodclasses)
+
+    assert charge_dists_reduced_actual == charge_dists_reduced_expected

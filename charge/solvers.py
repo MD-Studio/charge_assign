@@ -1,7 +1,7 @@
 import itertools
 from abc import ABC, abstractmethod
 from time import perf_counter
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, List
 
 import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
@@ -10,7 +10,6 @@ from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, 
 from charge.charge_types import Atom, ChargeList, WeightList
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS, DEFAULT_SHELL_SIZE
 from charge.util import AssignmentError
-from charge.nauty import Nauty
 
 
 class Solver(ABC):
@@ -25,6 +24,7 @@ class Solver(ABC):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str],
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -42,33 +42,6 @@ class Solver(ABC):
         """
         pass
 
-    def compute_neighborhood_canonical_key_dict(
-            self,
-            graph: nx.Graph,
-            shells: List[int],
-            nauty: Nauty) -> dict():
-
-        """Calculates a nauty canonical key for the neighborhood of each atom.
-
-        Args:
-            graph: The molecule graph to solve charges for.
-            shells: Shell sizes to use. uses first shellsize
-            nauty: A nauty instance
-
-        """
-
-        keydict = dict()
-
-        for atom in graph.nodes():
-            shellsize = shells[0]
-            atom_has_iacm = 'iacm' in graph.node[atom]
-
-            if atom_has_iacm:
-                keydict[atom] = nauty.canonize_neighborhood(graph, atom, shellsize, 'iacm')
-            else:
-                keydict[atom] = nauty.canonize_neighborhood(graph, atom, shellsize, 'atom_type')
-
-        return keydict
 
     def compute_atom_neighborhood_classes(self, atom_idx : dict, keydict : dict):
         L = list()
@@ -100,6 +73,7 @@ class SimpleSolver(Solver):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str] = None,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -177,6 +151,7 @@ class ILPSolver(Solver):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str] = None,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -270,8 +245,7 @@ class SymmetricILPSolver(Solver):
 
     def __init__(self,
                  rounding_digits: int=ROUNDING_DIGITS,
-                 max_seconds: int=ILP_SOLVER_MAX_SECONDS,
-                 nauty: Optional[Nauty]=None
+                 max_seconds: int=ILP_SOLVER_MAX_SECONDS
                  ) -> None:
         """Create an ILPSolver.
 
@@ -281,7 +255,6 @@ class SymmetricILPSolver(Solver):
                     solution
         """
         self.__rounding_digits = rounding_digits
-        self._nauty = nauty if nauty is not None else Nauty()
 
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)
@@ -302,8 +275,8 @@ class SymmetricILPSolver(Solver):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str],
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
-            shells: List[int]=DEFAULT_SHELL_SIZE,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -332,9 +305,6 @@ class SymmetricILPSolver(Solver):
         # profits = frequencies
         profits = dict()
 
-        # nauty hashes of k-neighborhoods for each atom
-        keydict = dict()
-
         pos_total = total_charge
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
@@ -342,9 +312,6 @@ class SymmetricILPSolver(Solver):
             weights[k] = charges
             profits[k] = frequencies
             pos_total -= min(charges)
-
-        # compute k-neighborhood-canonical key for each atom of the molecule
-        keydict = self.compute_neighborhood_canonical_key_dict(graph, shells, self._nauty)
 
         x = LpVariable.dicts('x', itertools.chain.from_iterable(idx), lowBound=0, upBound=1, cat=LpInteger)
 
@@ -424,6 +391,7 @@ class DPSolver(Solver):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str] = None,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -535,8 +503,7 @@ class SymmetricDPSolver(Solver):
     distributions.
     """
     def __init__(self,
-                 rounding_digits,
-                 nauty: Optional[Nauty]=None) -> None:
+                 rounding_digits) -> None:
         """Create a DPSolver.
 
         Args:
@@ -544,7 +511,6 @@ class SymmetricDPSolver(Solver):
                     resulting charges to.
         """
         self.__rounding_digits = rounding_digits
-        self._nauty = nauty if nauty is not None else Nauty()
 
 
     def solve_partial_charges(
@@ -552,8 +518,8 @@ class SymmetricDPSolver(Solver):
             graph: nx.Graph,
             charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str],
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
-            shells: List[int] = DEFAULT_SHELL_SIZE,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -581,7 +547,6 @@ class SymmetricDPSolver(Solver):
 
         for k, (atom, (_, _)) in enumerate(charge_dists_collector.items()):
             atom_idx[k] = atom
-        keydict = self.compute_neighborhood_canonical_key_dict(graph, shells, self._nauty)
         neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
 
         # reduce charge distributions (charges and frequencies of atoms within one neighborhoodclass get combined)
@@ -711,6 +676,7 @@ class CDPSolver(Solver):
             graph: nx.Graph,
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
+            keydict: Dict[Atom, str] = None,
             total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:

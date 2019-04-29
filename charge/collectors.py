@@ -71,6 +71,7 @@ class Collector(ABC):
         """
         charges = dict()
         no_vals = list()
+        keys = dict()
 
         for atom in graph.nodes():
             for shell_size in shells:
@@ -81,12 +82,14 @@ class Collector(ABC):
                         key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'iacm')
                         if key in self._repository.charges_iacm[shell_size]:
                             charges[atom] = self._collect(self._repository.charges_iacm, shell_size, key)
+                            keys[atom] = key
 
                 if not atom_has_iacm or (not atom in charges and not iacm_data_only):
                     if shell_size in self._repository.charges_elem:
                         key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'atom_type')
                         if key in self._repository.charges_elem[shell_size]:
                             charges[atom] = self._collect(self._repository.charges_elem, shell_size, key)
+                            keys[atom] = key
 
                 if atom in charges:
                     break
@@ -94,7 +97,7 @@ class Collector(ABC):
                 no_vals.append(atom)
 
         self._handle_error(no_vals, shells)
-        return charges
+        return charges, keys
 
     @abstractmethod
     def _collect(

@@ -76,8 +76,8 @@ class Charger(ABC):
         if iacmize:
             graph = util.iacmize(graph)
 
-        values = self._collector.collect_values(graph, iacm_data_only or iacmize, shells, **kwargs)
-        self._solver.solve_partial_charges(graph, values, total_charge, shells=shells, **kwargs)
+        values, keydict = self._collector.collect_values(graph, iacm_data_only or iacmize, shells, **kwargs)
+        self._solver.solve_partial_charges(graph, values, total_charge, keydict, **kwargs)
         self.__add_redistributed_charges(graph, total_charge)
 
     def __add_redistributed_charges(
@@ -305,7 +305,7 @@ class SymmetricILPCharger(Charger):
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         if caching:
             self._collector = CachingCollector(self._collector)
-        self._solver = SymmetricILPSolver(rounding_digits, max_seconds, self._nauty)
+        self._solver = SymmetricILPSolver(rounding_digits, max_seconds)
 
 
 class DPCharger(Charger):
@@ -382,7 +382,7 @@ class SymmetricDPCharger(Charger):
         self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
         if caching:
             self._collector = CachingCollector(self._collector)
-        self._solver = SymmetricDPSolver(rounding_digits, self._nauty)
+        self._solver = SymmetricDPSolver(rounding_digits)
 
 
 class CDPCharger(Charger):

@@ -71,11 +71,12 @@ def test_symmetricilp_solver(ref_graph):
             4: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25]),
             5: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25])
             }
+    keydict = {1: 'A', 2: 'B', 3: 'B', 4: 'B', 5: 'B'}
     solver.solve_partial_charges(
             ref_graph,
             charge_dists,
             0,
-            shells=[2, 1, 0])
+            keydict)
 
     assert ref_graph.node[1]['partial_charge'] == -0.52
     assert ref_graph.node[1]['score'] == 0.5
@@ -131,10 +132,12 @@ def test_symmetric_dp_solver(ref_graph):
         4: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25]),
         5: ([0.12, 0.13, 0.14, 0.15], [0.25, 0.25, 0.25, 0.25])
     }
+    keydict = {1: 'A', 2: 'B', 3: 'B', 4: 'B', 5: 'B'}
     solver.solve_partial_charges(
             ref_graph,
             charge_dists,
-            0)
+            0,
+            keydict)
 
     assert ref_graph.node[1]['partial_charge'] == -0.52
     assert ref_graph.node[1]['score'] == 0.5

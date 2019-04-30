@@ -340,7 +340,8 @@ class SymmetricILPSolver(Solver):
             >= -total_charge_diff
 
         #identical neighborhood charge conditions
-        for neighborhood_class in self.compute_atom_neighborhood_classes(atom_idx, keydict):
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        for neighborhood_class in neighborhoodclasses:
             i = neighborhood_class[0]
             for j in neighborhood_class[1::]:
                 for (_, k) in idx[i]:
@@ -375,6 +376,7 @@ class SymmetricILPSolver(Solver):
         graph.graph['time'] = solutionTime
         graph.graph['items'] = len(x)
         graph.graph['scaled_capacity'] = pos_total + total_charge_diff
+        graph.graph['neighborhoods'] = [[atom_idx[k] for k in i] for i in neighborhoodclasses]
 
 
 class DPSolver(Solver):
@@ -579,6 +581,7 @@ class SymmetricDPSolver(Solver):
         graph.graph['time'] = solutionTime
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
+        graph.graph['neighborhoods'] = [[atom_idx[k] for k in i] for i in neighborhoodclasses]
 
     def transform_weights(self, charge_dists, total_charge, blowup):
         atom_idx = dict()

@@ -567,17 +567,19 @@ class SymmetricDPSolver(Solver):
 
         items, pos_total_charge, max_sum = self.transform_weights(charge_dists_reduced, total_charge, blowup)
 
-        solution, max_val, solutionTime = self.solve_dp(items, total_charge_diff, pos_total_charge, max_sum, blowup)
+        solution, solutionTime = self.solve_dp(items, total_charge_diff, pos_total_charge, max_sum, blowup)
 
         charge = 0
+        score = 0
         for i, j in enumerate(solution):
             for k in neighborhoodclasses[i]:
                 graph.node[atom_idx[k]]['partial_charge'] = charge_dists_collector[atom_idx[k]][0][j]
                 graph.node[atom_idx[k]]['score'] = charge_dists_collector[atom_idx[k]][1][j]
                 charge += graph.node[atom_idx[k]]['partial_charge']
+                score += graph.node[atom_idx[k]]['score']
 
         graph.graph['total_charge'] = round(charge, self.__rounding_digits)
-        graph.graph['score'] = max_val
+        graph.graph['score'] = score
         graph.graph['time'] = solutionTime
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff
@@ -653,7 +655,7 @@ class SymmetricDPSolver(Solver):
 
         solution = tb[lower + max_pos]
 
-        return solution, max_val, solutionTime
+        return solution, solutionTime
 
     def reduce_charge_distributions(self, charge_dists_collector, atom_idx, neighborhoodclasses):
         charge_dists = dict()

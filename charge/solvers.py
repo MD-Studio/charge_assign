@@ -494,14 +494,15 @@ class DPSolver(Solver):
         solution = tb[lower + max_pos]
 
         charge = 0
+        score = 0
         for i, j in enumerate(solution):
-            graph.node[atom_idx[i]]['partial_charge'] = round((deflate * items[i][j][1]) + w_min[i],
-                                                              self.__rounding_digits)
-            graph.node[atom_idx[i]]['score'] = items[i][j][2]
+            graph.node[atom_idx[i]]['partial_charge'] = charge_dists[atom_idx[i]][0][j]
+            graph.node[atom_idx[i]]['score'] = charge_dists[atom_idx[i]][1][j]
             charge += graph.node[atom_idx[i]]['partial_charge']
+            score += graph.node[atom_idx[i]]['score']
 
         graph.graph['total_charge'] = round(charge, self.__rounding_digits)
-        graph.graph['score'] = max_val
+        graph.graph['score'] = score
         graph.graph['time'] = solutionTime
         graph.graph['items'] = sum(len(i) for i in items)
         graph.graph['scaled_capacity'] = pos_total_charge + total_charge_diff

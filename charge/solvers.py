@@ -662,13 +662,9 @@ class SymmetricDPSolver(Solver):
         charge_dists = dict()
         for neighborhoodclass in neighborhoodclasses:
             i = neighborhoodclass[0]
-            charge_dists[atom_idx[i]] = charge_dists_collector[atom_idx[i]]
-            for j in neighborhoodclass[1::]:
-                #Add the charges and frequencies of Atom j to those of atom i
-                charges = [round(sum(x),self.__rounding_digits) for x in zip(charge_dists[atom_idx[i]][0], charge_dists_collector[atom_idx[j]][0])]
-                frequencies = [round(sum(x),self.__rounding_digits) for x in zip(charge_dists[atom_idx[i]][1], charge_dists_collector[atom_idx[j]][1])]
-
-                charge_dists[atom_idx[i]] = (charges,frequencies)
+            k = len(neighborhoodclass)
+            (charges, frequencies) = charge_dists_collector[atom_idx[i]]
+            charge_dists[atom_idx[i]] = ([k * x for x in charges], [k * x for x in frequencies])
 
         return charge_dists
 

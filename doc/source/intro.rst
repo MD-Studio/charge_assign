@@ -41,6 +41,11 @@ However, using the simple chargers might result in a total charge that is way of
     * The :class:`ILPCharger <charge.chargers.ILPCharger>` solves the problem with an integer linear program using `PuLP <https://pythonhosted.org/PuLP/>`_.
     * The :class:`DPCharger <charge.chargers.DPCharger>` solves the problem with a dynamic program implemented in Python.
 
+Using those Chargers will yield partial charges for which the total sum is close to the total charge of the molecule and for which the frequencies have been maximised. When looking at the molecules the assigned charges of two atoms with identical k-neighborhoods might differ as the chargers are not bound to apply the same charges. To get symmetric charges you can use these chargers which will (if possible) assign identical charges to atoms with identical atom neighborhoods:
+
+    * The :class:`SymmetricDPCharger <charge.chargers.SymmetricDPCharger>` solves the problem with a dynamic program implemented in Python and assign symmetric charges.
+    * The :class:`SymmetricILPCharger <charge.chargers.SymmetricILPCharger>` solves the problem with an integer linear program using `PuLP <https://pythonhosted.org/PuLP/>`_ and assign symmetric charges.
+
 Batch Computations
 ------------------
 

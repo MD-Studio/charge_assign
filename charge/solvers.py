@@ -741,8 +741,6 @@ class CDPSolver(Solver):
         num_sets = len(charge_dists)
         num_items = sum(len(charges) for (_, (charges, _)) in charge_dists.items())
 
-        atom_idx = dict()
-
         weights = dp.new_doublea(num_items)
         profits = dp.new_doublea(num_items)
         sets = dp.new_ushorta(num_sets)
@@ -751,7 +749,6 @@ class CDPSolver(Solver):
         offset = 0
         pos_total = total_charge
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
-            atom_idx[k] = atom
             dp.ushorta_setitem(sets, k, len(charges))
             for i, (charge, frequency) in enumerate(zip(charges, frequencies)):
                 dp.doublea_setitem(weights, offset + i, charge)
@@ -875,8 +872,6 @@ class SymmetricCDPSolver(Solver):
         num_sets = len(charge_dists)
         num_items = sum(len(charges) for (_, (charges, _)) in charge_dists.items())
 
-        atom_idx = dict()
-
         weights = dp.new_doublea(num_items)
         profits = dp.new_doublea(num_items)
         sets = dp.new_ushorta(num_sets)
@@ -885,7 +880,6 @@ class SymmetricCDPSolver(Solver):
         offset = 0
         pos_total = total_charge
         for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
-            atom_idx[k] = atom
             dp.ushorta_setitem(sets, k, len(charges))
             for i, (charge, frequency) in enumerate(zip(charges, frequencies)):
                 dp.doublea_setitem(weights, offset + i, charge)

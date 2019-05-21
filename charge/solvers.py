@@ -713,6 +713,29 @@ class CDPSolver(Solver):
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
+        atom_idx = dict()
+        for k, (atom, (_, _)) in enumerate(charge_dists.items()):
+            atom_idx[k] = atom
+
+        solution, solutionTime, num_items, scaled_capacity = self.solve_dp_c(charge_dists, total_charge, total_charge_diff)
+
+        charge = 0
+        profit = 0
+        for (i,j) in solution:
+            graph.node[atom_idx[i]]['partial_charge'] = charge_dists[atom_idx[i]][0][j]
+            graph.node[atom_idx[i]]['score'] = charge_dists[atom_idx[i]][1][j]
+            charge += graph.node[atom_idx[i]]['partial_charge']
+            profit += graph.node[atom_idx[i]]['score']
+
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
+        graph.graph['score'] = profit
+        graph.graph['time'] = solutionTime
+        graph.graph['items'] = num_items
+        graph.graph['scaled_capacity'] = scaled_capacity
+
+
+    def solve_dp_c(self, charge_dists, total_charge, total_charge_diff):
+
         import charge.c.dp as dp
 
         num_sets = len(charge_dists)
@@ -745,21 +768,12 @@ class CDPSolver(Solver):
 
         solutionTime += perf_counter()
 
+        dp_solution = list()
         if profit >= 0:
-            charge = 0
-            offset = 0
             for k in range(num_sets):
                 i = dp.ushorta_getitem(solution, k)
-                graph.node[atom_idx[k]]['partial_charge'] = dp.doublea_getitem(weights, offset + i)
-                graph.node[atom_idx[k]]['score'] = dp.doublea_getitem(profits, offset + i)
-                charge += graph.node[atom_idx[k]]['partial_charge']
-                offset += dp.ushorta_getitem(sets, k)
+                dp_solution.append((k, i))
 
-            graph.graph['total_charge'] = round(charge, self.__rounding_digits)
-            graph.graph['score'] = profit
-            graph.graph['time'] = solutionTime
-            graph.graph['items'] = num_items
-            graph.graph['scaled_capacity'] = pos_total + total_charge_diff
 
         dp.delete_doublea(weights)
         dp.delete_doublea(profits)
@@ -768,4 +782,6 @@ class CDPSolver(Solver):
 
         if profit < 0:
             raise AssignmentError('Could not solve DP problem. Please retry'
-                    ' with a SimpleCharger')
+                                  ' with a SimpleCharger')
+
+        return dp_solution, solutionTime, num_items, (pos_total + total_charge_diff)

@@ -7,6 +7,8 @@ import networkx as nx
 from pulp import LpVariable, LpInteger, LpMaximize, LpProblem, LpStatusOptimal, CPLEX_CMD, GUROBI_CMD, PULP_CBC_CMD, \
     GLPK_CMD, COIN_CMD
 
+from collections import defaultdict
+
 from charge.charge_types import Atom, ChargeList, WeightList
 from charge.settings import DEFAULT_TOTAL_CHARGE_DIFF, ROUNDING_DIGITS, ILP_SOLVER_MAX_SECONDS
 from charge.util import AssignmentError
@@ -47,19 +49,12 @@ class Solver(ABC):
 
 
     def compute_atom_neighborhood_classes(self, atom_idx : dict, keydict : dict):
-        L = list()
-        atoms = list(atom_idx)
+        L = defaultdict(list)
 
-        while(len(atoms) > 0):
-            i = atoms[0]
-            l = list([i])
-            for j in atoms[1::]:
-                if (keydict[atom_idx[i]] == keydict[atom_idx[j]]):  # if atoms i and j have identical neighborhoods
-                    l.append(j)
-            L.append(l)
-            for j in l:
-                atoms.remove(j)
-        return L
+        for atom in atom_idx:
+            L[keydict[atom_idx[atom]]].append(atom)
+
+        return [L[l] for l in L]
 
 
 class SimpleSolver(Solver):

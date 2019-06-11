@@ -10,7 +10,7 @@ import networkx as nx
 
 from charge.babel import convert_from, IOType
 from charge.charge_types import Atom
-from charge.chargers import make_charger, MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger
+from charge.chargers import make_charger, MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger, SymmetricILPCharger, SymmetricDPCharger, SymmetricCDPCharger
 from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.util import AssignmentError
@@ -42,7 +42,7 @@ def cross_validate_methods(
     mean_abs_err = dict()
     mean_sq_err = dict()
 
-    for charger_type in [MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger]:
+    for charger_type in [MeanCharger, MedianCharger, ModeCharger, ILPCharger, DPCharger, CDPCharger, SymmetricILPCharger, SymmetricILPCharger, SymmetricCDPCharger]:
         charger_name = charger_type.__name__
         mean_abs_err[charger_name] = dict()
         mean_sq_err[charger_name] = dict()

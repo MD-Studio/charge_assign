@@ -506,8 +506,9 @@ class SymmetricRelaxedILPSolver(Solver):
                     graph.nodes[atom_idx[k]]['partial_charge'] = weights[k][i] * x[(k, i)].value()
                     graph.nodes[atom_idx[k]]['score'] = profits[k][i] * x[(k, i)].value()
                 solution.append(i)
-                profit += profits[k][i]
-                charge += graph.nodes[atom_idx[k]]['partial_charge']
+        for node in graph.nodes:
+            profit += graph.nodes[node]['score']
+            charge += graph.nodes[node]['partial_charge']
 
         graph.graph['total_charge'] = round(charge, self.__rounding_digits)
         graph.graph['score'] = profit

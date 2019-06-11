@@ -12,7 +12,7 @@ from charge.nauty import Nauty
 from charge.repository import Repository
 from charge.settings import ROUNDING_DIGITS, DEFAULT_TOTAL_CHARGE, MAX_ROUNDING_DIGITS, MAX_BINS, ILP_SOLVER_MAX_SECONDS
 from charge.solvers import CDPSolver, DPSolver, ILPSolver, SimpleSolver, SymmetricILPSolver, SymmetricDPSolver, \
-    SymmetricCDPSolver
+    SymmetricCDPSolver, SymmetricRelaxedILPSolver
 
 
 class Charger(ABC):
@@ -307,6 +307,47 @@ class SymmetricILPCharger(Charger):
         if caching:
             self._collector = CachingCollector(self._collector)
         self._solver = SymmetricILPSolver(rounding_digits, max_seconds)
+
+class SymmetricRelaxedILPCharger(Charger):
+    """A charger that uses Integer Linear Programming.
+
+    This charger calculates an optimal charge distribution given the \
+    charges found in a repository, using Integer Linear Programming.
+    """
+    def __init__(
+            self,
+            repository: Repository,
+            rounding_digits: Optional[int] = ROUNDING_DIGITS,
+            max_seconds: Optional[int] = ILP_SOLVER_MAX_SECONDS,
+            nauty: Optional[Nauty]=None,
+            caching: Optional[bool] = False,
+            scoring: Optional[MethodType]=None,
+            max_bins: Optional[int] = MAX_BINS
+            ) -> None:
+        """Create an ILPCharger.
+
+        Nauty instances manage an external process, so they're \
+        somewhat expensive to create. If you have multiple chargers, \
+        you could consider sharing one between them.
+
+        Args:
+            repository: The repository to get charges from
+            rounding_digits: Number of digits to round charges to
+            max_seconds: A limit for the run time. If no solution is \
+                    found within this limit, an exception will be \
+                    raised.
+            nauty: An external Nauty instance to use
+            caching: Cache collected charges
+            scoring: A scoring function for the histogram. See \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_count`, \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_log`, and \
+             :func:`~charge.collectors.HistogramCollector.score_histogram_martin`.
+        """
+        super().__init__(repository, rounding_digits, nauty)
+        self._collector = HistogramCollector(repository, rounding_digits, self._nauty, scoring, max_bins)
+        if caching:
+            self._collector = CachingCollector(self._collector)
+        self._solver = SymmetricRelaxedILPSolver(rounding_digits, max_seconds)
 
 
 class DPCharger(Charger):

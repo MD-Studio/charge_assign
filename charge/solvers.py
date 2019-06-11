@@ -374,6 +374,148 @@ class SymmetricILPSolver(Solver):
         graph.graph['neighborhoods'] = [[atom_idx[k] for k in i] for i in neighborhoodclasses]
 
 
+class SymmetricRelaxedILPSolver(Solver):
+    """An optimizing solver using Integer Linear Programming.
+
+    Use the HistogramCollector to produce appropriate charge \
+    distributions.
+    """
+
+    def __init__(self,
+                 rounding_digits: int=ROUNDING_DIGITS,
+                 max_seconds: int=ILP_SOLVER_MAX_SECONDS
+                 ) -> None:
+        """Create an ILPSolver.
+
+        Args:
+            rounding_digits: Number of digits to round the charges to.
+            max_seconds: Maximum run-time to spend searching for a \
+                    solution
+        """
+        self.__rounding_digits = rounding_digits
+
+        if CPLEX_CMD().available():
+            self.__solver = CPLEX_CMD(timelimit=max_seconds)
+        elif GUROBI_CMD().available():
+            self.__solver = GUROBI_CMD(options={'timeLimit':max_seconds})
+        elif PULP_CBC_CMD().available():
+            self.__solver = PULP_CBC_CMD(maxSeconds=max_seconds)
+        elif GLPK_CMD().available():
+            self.__solver = GLPK_CMD(options=['--tmlim %d' % max_seconds])
+        elif COIN_CMD().available():
+            self.__solver = COIN_CMD(maxSeconds=max_seconds)
+        else:
+            raise RuntimeError('No solver found, there is something'
+                    ' wrong with your pulp library setup.')
+
+    def solve_partial_charges(
+            self,
+            graph: nx.Graph,
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            total_charge: int,
+            keydict: Dict[Atom, str],
+            total_charge_diff: float=DEFAULT_TOTAL_CHARGE_DIFF,
+            **kwargs
+            ) -> None:
+        """Assign charges to the atoms in a graph.
+
+        Modify a graph by adding additional attributes describing the \
+        atoms' charges and scores. In particular, each atom will get \
+        a 'partial_charge' attribute with the partial charge, and a \
+        'score' attribute giving a degree of certainty for that charge.
+
+        This solver formulates the epsilon-Multiple Choice Knapsack \
+        Problem as an Integer Linear Programming problem and then uses \
+        a generic ILP solver from the pulp library to produce optimised \
+        charges.
+
+        Args:
+            graph: The molecule graph to solve charges for.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph
+            total_charge_diff: Maximum allowed deviation from the total charge
+        """
+
+        atom_idx = dict()
+        idx = list()
+        # weights = partial charges
+        weights = dict()
+        # profits = frequencies
+        profits = dict()
+
+        pos_total = total_charge
+        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+            atom_idx[k] = atom
+            idx.append(list(zip(itertools.repeat(k), range(len(charges)))))
+            weights[k] = charges
+            profits[k] = frequencies
+            pos_total -= min(charges)
+
+        x = LpVariable.dicts('x', itertools.chain.from_iterable(idx), lowBound=0, upBound=1)
+
+        charging_problem = LpProblem("Atomic Charging Problem", LpMaximize)
+
+        # maximize profits
+        charging_problem += sum([profits[k][i] * x[(k, i)] for k, i in itertools.chain.from_iterable(idx)])
+
+        # select exactly one item per set
+        for indices in idx:
+            charging_problem += sum([x[(k, i)] for k, i in indices]) == 1
+
+        # total charge difference
+        charging_problem +=\
+            sum([weights[k][i] * x[(k, i)] for k, i in itertools.chain.from_iterable(idx)]) - total_charge\
+            <= total_charge_diff
+        charging_problem +=\
+            sum([weights[k][i] * x[(k, i)] for k, i in itertools.chain.from_iterable(idx)]) - total_charge\
+            >= -total_charge_diff
+
+        #identical neighborhood charge conditions
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        for neighborhood_class in neighborhoodclasses:
+            i = neighborhood_class[0]
+            for j in neighborhood_class[1::]:
+                for (_, k) in idx[i]:
+                    charging_problem += x[(i, k)] - x[(j, k)] == 0                  # weight k from atom i is selected as partial charge <=> weight k of atom j is selected as partial charge
+
+
+        solutionTime = -perf_counter()
+        try:
+            charging_problem.solve(solver=self.__solver)
+        except:
+            raise AssignmentError('Could not solve ILP problem. Please retry'
+                    ' with a SimpleCharger')
+        solutionTime += perf_counter()
+
+        if not charging_problem.status == LpStatusOptimal:
+            raise AssignmentError('Could not solve ILP problem. Please retry'
+                    ' with a SimpleCharger')
+
+        solution = []
+        profit = 0
+        charge = 0
+        for k, i in itertools.chain.from_iterable(idx):
+            if x[(k, i)].value() != 0.0:
+                if('partial_charge' in graph.nodes[atom_idx[k]]):
+                    graph.nodes[atom_idx[k]]['partial_charge'] += weights[k][i] * x[(k, i)].value()
+                    graph.nodes[atom_idx[k]]['score'] += profits[k][i] * x[(k, i)].value()
+                else:
+                    graph.nodes[atom_idx[k]]['partial_charge'] = weights[k][i] * x[(k, i)].value()
+                    graph.nodes[atom_idx[k]]['score'] = profits[k][i] * x[(k, i)].value()
+                solution.append(i)
+                profit += profits[k][i]
+                charge += graph.nodes[atom_idx[k]]['partial_charge']
+
+        graph.graph['total_charge'] = round(charge, self.__rounding_digits)
+        graph.graph['score'] = profit
+        graph.graph['time'] = solutionTime
+        graph.graph['items'] = len(x)
+        graph.graph['scaled_capacity'] = pos_total + total_charge_diff
+        graph.graph['neighborhoods'] = [[atom_idx[k] for k in i] for i in neighborhoodclasses]
+
 class DPSolver(Solver):
     """An optimizing solver using Dynamic Programming.
 

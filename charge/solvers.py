@@ -499,12 +499,13 @@ class SymmetricRelaxedILPSolver(Solver):
         charge = 0
         for k, i in itertools.chain.from_iterable(idx):
             if x[(k, i)].value() != 0.0:
-                if('partial_charge' in graph.nodes[atom_idx[k]]):
+                if('partial_charge' in graph.nodes[atom_idx[k]] and 'score' in graph.nodes[atom_idx[k]]):
                     graph.nodes[atom_idx[k]]['partial_charge'] += weights[k][i] * x[(k, i)].value()
                     graph.nodes[atom_idx[k]]['score'] += profits[k][i] * x[(k, i)].value()
                 else:
                     graph.nodes[atom_idx[k]]['partial_charge'] = weights[k][i] * x[(k, i)].value()
                     graph.nodes[atom_idx[k]]['score'] = profits[k][i] * x[(k, i)].value()
+
                 solution.append(i)
         for node in graph.nodes:
             profit += graph.nodes[node]['score']

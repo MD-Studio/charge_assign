@@ -29,6 +29,7 @@ DEFAULT_TOTAL_CHARGE = 0
 DEFAULT_TOTAL_CHARGE_DIFF = 0.01
 """Default allowed deviation from target total charge."""
 
+
 MAX_BINS = 25
 """Maximal number of bins for the histogram calculations."""
 

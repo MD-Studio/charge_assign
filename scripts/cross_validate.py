@@ -64,3 +64,7 @@ if __name__ == '__main__':
     cross_validate('ILPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
     cross_validate('CDPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
     cross_validate('CDPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('SymmetricILPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('SymmetricILPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('SymmetricCDPCharger', False, 3, test_data_dir, repo, bucket, num_buckets)
+    cross_validate('SymmetricCDPCharger', True, 3, test_data_dir, repo, bucket, num_buckets)

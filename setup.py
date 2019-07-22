@@ -6,7 +6,7 @@ dp_module = Extension('_dp',
 setup(
         name = 'charge_assign',
         packages = ['charge', 'charge_server'],
-        version = '0.0.1',
+        version = '0.0.2',
         description = 'Assigns charges to atoms in molecules by template matching',
         author = 'Martin Engler',
         author_email = 'martin.engler@cwi.nl',

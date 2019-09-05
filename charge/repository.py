@@ -249,19 +249,19 @@ class Repository:
                 raise ValueError('Zip file is missing "meta", "charges_iacm" or "charges_elem" entries.')
 
             repo.__min_shell, repo.__max_shell, repo.__traceable = msgpack.unpackb(
-                    zf.read('meta'), encoding='utf-8')
+                    zf.read('meta'), raw=False)
             repo.charges_iacm = msgpack.unpackb(
-                    zf.read('charges_iacm'), encoding='utf-8')
+                    zf.read('charges_iacm'), raw=False)
             repo.charges_elem = msgpack.unpackb(
-                    zf.read('charges_elem'), encoding='utf-8')
+                    zf.read('charges_elem'), raw=False)
 
             if repo.__traceable:
                 if not 'iso_iacm' in names and not 'iso_elem' in names:
                     raise ValueError('Zip file is missing "iso_iacm" or "iso_elem" entries.')
                 repo.iso_iacm = msgpack.unpackb(
-                        zf.read('iso_iacm'), encoding='utf-8')
+                        zf.read('iso_iacm'), raw=False)
                 repo.iso_elem = msgpack.unpackb(
-                        zf.read('iso_elem'), encoding='utf-8')
+                        zf.read('iso_elem'), raw=False)
 
             if versioning:
                 for _, chdct in repo.charges_iacm.items():

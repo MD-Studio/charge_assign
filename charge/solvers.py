@@ -43,12 +43,24 @@ class Solver(ABC):
             total_charge: The total charge of the molecule.
             keydict: Dictionary containing nauty canonical keys of atom \
                     neighborhoods for each atom of the graph \
-                    only used in Symmetric Solvers
+                    only used in Symmetric Solvers.
         """
         pass
 
     @staticmethod
     def compute_atom_neighborhood_classes(atom_idx: Dict[int, Atom], keydict: Dict[Atom, str]) -> List[List[Atom]]:
+        """Groups atoms into neighborhood equivalence classes.
+
+        Atoms with isomorphic k-neighborhoods are considered equivalent.
+
+        Args:
+            atom_idx: Dictionary mapping index to atom.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph.
+
+        Returns:
+            List of atom equivalence classes.
+        """
         L = defaultdict(list)
 
         for atom in atom_idx:
@@ -61,6 +73,16 @@ class Solver(ABC):
             charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
             atom_idx: Dict[int, Atom],
             neighborhoodclasses: List[List[Atom]]) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
+        """Joins charge distributions of atoms in the same equivalence class.
+
+        Args:
+            charge_dists_collector: Charge distributions for the atoms, obtained by a Collector.
+            atom_idx: Dictionary mapping index to atom.
+            neighborhoodclasses: List of atom equivalence classes.
+
+        Returns:
+            Charge distributions for the equivalence classes.
+        """
         charge_dists = dict()
         for neighborhoodclass in neighborhoodclasses:
             i = neighborhoodclass[0]
@@ -104,6 +126,9 @@ class SimpleSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph \
+                    only used in Symmetric Solvers.
         """
         solutionTime = -perf_counter()
 
@@ -183,6 +208,9 @@ class ILPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph \
+                    only used in Symmetric Solvers.
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -536,6 +564,9 @@ class DPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph \
+                    only used in Symmetric Solvers.
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -570,6 +601,18 @@ class DPSolver(Solver):
             charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
             total_charge: int,
             blowup: int) -> Tuple[List[List[Tuple[int, int, float]]], float, float]:
+        """Transform charge distributions into knapsack items with positive integer weights.
+
+        Args:
+            charge_dists:
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+            blowup: Blowup factor.
+
+        Returns:
+            Tuple of knapsack items, the transformed total charge and the sum of all maximal charges per item class.
+        """
         atom_idx = dict()
         # item = (index, weight, profit)
         items = list()
@@ -597,6 +640,18 @@ class DPSolver(Solver):
             pos_total_charge: float,
             max_sum: float,
             blowup: int):
+        """Solves the knapsack problem with dynamic programming implemented in Python.
+
+        Args:
+            items: Knapsack items.
+            total_charge_diff: Maximum allowed deviation from the total charge.
+            pos_total_charge: Transformed total charge.
+            max_sum: Sum of all maximal charges per item class.
+            blowup: Blowup factor.
+
+        Returns:
+            Tuple of solution and solution time.
+        """
 
         solutionTime = -perf_counter()
         # lower and upper capacity limits
@@ -763,6 +818,8 @@ class CDPSolver(Solver):
             charge_dists: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -790,6 +847,17 @@ class CDPSolver(Solver):
                    charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
                    total_charge: float,
                    total_charge_diff: float) -> Tuple[List[Tuple[int, int]], float, int, float]:
+        """Solves the knapsack problem with dynamic programming implemented in C.
+
+        Args:
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector.
+            total_charge: The total charge of the molecule.
+            total_charge_diff: Maximum allowed deviation from the total charge
+
+        Returns:
+            Tuple of solution, solution time, the number of items and the scaled capacity.
+        """
 
         import charge.c.dp as dp
 
@@ -876,9 +944,11 @@ class SymmetricCDPSolver(CDPSolver):
 
         Args:
             graph: The molecule graph to solve charges for.
-            charge_dists: Charge distributions for the atoms, obtained \
+            charge_dists_collector: Charge distributions for the atoms, obtained \
                     by a Collector.
             total_charge: The total charge of the molecule.
+            keydict: Dictionary containing nauty canonical keys of atom \
+                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 

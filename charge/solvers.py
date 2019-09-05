@@ -133,7 +133,7 @@ class ILPSolver(Solver):
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)
         elif GUROBI_CMD().available():
-            self.__solver = GUROBI_CMD(options={'timeLimit':max_seconds})
+            self.__solver = GUROBI_CMD(options=[('timeLimit', max_seconds)])
         elif PULP_CBC_CMD().available():
             self.__solver = PULP_CBC_CMD(maxSeconds=max_seconds)
         elif GLPK_CMD().available():
@@ -258,7 +258,7 @@ class SymmetricILPSolver(Solver):
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)
         elif GUROBI_CMD().available():
-            self.__solver = GUROBI_CMD(options={'timeLimit':max_seconds})
+            self.__solver = GUROBI_CMD(options=[('timeLimit',max_seconds)])
         elif PULP_CBC_CMD().available():
             self.__solver = PULP_CBC_CMD(maxSeconds=max_seconds)
         elif GLPK_CMD().available():
@@ -397,7 +397,7 @@ class SymmetricRelaxedILPSolver(Solver):
         if CPLEX_CMD().available():
             self.__solver = CPLEX_CMD(timelimit=max_seconds)
         elif GUROBI_CMD().available():
-            self.__solver = GUROBI_CMD(options={'timeLimit':max_seconds})
+            self.__solver = GUROBI_CMD(options=[('timeLimit',max_seconds)])
         elif PULP_CBC_CMD().available():
             self.__solver = PULP_CBC_CMD(maxSeconds=max_seconds)
         elif GLPK_CMD().available():

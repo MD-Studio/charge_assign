@@ -77,8 +77,8 @@ class Charger(ABC):
         if iacmize:
             graph = util.iacmize(graph)
 
-        values, keydict = self._collector.collect_values(graph, iacm_data_only or iacmize, shells, **kwargs)
-        self._solver.solve_partial_charges(graph, values, total_charge, keydict, **kwargs)
+        values = self._collector.collect_values(graph, iacm_data_only or iacmize, shells, **kwargs)
+        self._solver.solve_partial_charges(graph, values, total_charge, **kwargs)
         self.__add_redistributed_charges(graph, total_charge)
 
     def __add_redistributed_charges(

@@ -24,9 +24,8 @@ class Solver(ABC):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str],
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -39,24 +38,23 @@ class Solver(ABC):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph \
-                    only used in Symmetric Solvers.
         """
         pass
 
     @staticmethod
-    def compute_atom_neighborhood_classes(atom_idx: Dict[int, Atom], keydict: Dict[Atom, str]) -> List[List[Atom]]:
+    def compute_atom_neighborhood_classes(
+            atom_idx: Dict[int, Atom],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]]) -> List[List[Atom]]:
         """Groups atoms into neighborhood equivalence classes.
 
         Atoms with isomorphic k-neighborhoods are considered equivalent.
 
         Args:
             atom_idx: Dictionary mapping index to atom.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph.
+            charge_dists: Charge distributions for the atoms, obtained \
+                    by a Collector, plus the atom's canonical key.
 
         Returns:
             List of atom equivalence classes.
@@ -64,15 +62,15 @@ class Solver(ABC):
         L = defaultdict(list)
 
         for atom in atom_idx:
-            L[keydict[atom_idx[atom]]].append(atom)
+            L[charge_dists[atom_idx[atom]][2]].append(atom)
 
         return [L[l] for l in L]
 
     @staticmethod
     def reduce_charge_distributions(
-            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             atom_idx: Dict[int, Atom],
-            neighborhoodclasses: List[List[Atom]]) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
+            neighborhoodclasses: List[List[Atom]]) -> Dict[Atom, Tuple[ChargeList, WeightList, str]]:
         """Joins charge distributions of atoms in the same equivalence class.
 
         Args:
@@ -87,8 +85,8 @@ class Solver(ABC):
         for neighborhoodclass in neighborhoodclasses:
             i = neighborhoodclass[0]
             k = len(neighborhoodclass)
-            (charges, frequencies) = charge_dists_collector[atom_idx[i]]
-            charge_dists[atom_idx[i]] = ([k * x for x in charges], [k * x for x in frequencies])
+            (charges, frequencies, key) = charge_dists_collector[atom_idx[i]]
+            charge_dists[atom_idx[i]] = ([k * x for x in charges], [k * x for x in frequencies], key)
 
         return charge_dists
 
@@ -105,9 +103,8 @@ class SimpleSolver(Solver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str] = None,
             **kwargs
             ) -> None:
         """Assign charges to the atoms in a graph.
@@ -124,17 +121,14 @@ class SimpleSolver(Solver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph \
-                    only used in Symmetric Solvers.
         """
         solutionTime = -perf_counter()
 
         profit = 0
         charge = 0
-        for atom, (pcs, scores) in charge_dists.items():
+        for atom, (pcs, scores, _) in charge_dists.items():
             graph.node[atom]['partial_charge'] = pcs[0]
             graph.node[atom]['score'] = scores[0]
             charge += pcs[0]
@@ -185,9 +179,8 @@ class ILPSolver(Solver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str] = None,
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -206,11 +199,8 @@ class ILPSolver(Solver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph \
-                    only used in Symmetric Solvers.
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -221,7 +211,7 @@ class ILPSolver(Solver):
         # profits = frequencies
         profits = dict()
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+        for k, (atom, (charges, frequencies, _)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(list(zip(itertools.repeat(k), range(len(charges)))))
             weights[k] = charges
@@ -297,9 +287,8 @@ class SymmetricILPSolver(ILPSolver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str],
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -321,10 +310,8 @@ class SymmetricILPSolver(ILPSolver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -336,7 +323,7 @@ class SymmetricILPSolver(ILPSolver):
         profits = dict()
 
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+        for k, (atom, (charges, frequencies, _)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(list(zip(itertools.repeat(k), range(len(charges)))))
             weights[k] = charges
@@ -363,7 +350,7 @@ class SymmetricILPSolver(ILPSolver):
             >= -total_charge_diff
 
         # identical neighborhood charge conditions
-        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, charge_dists)
         for neighborhood_class in neighborhoodclasses:
             i = neighborhood_class[0]
             for j in neighborhood_class[1::]:
@@ -421,9 +408,8 @@ class SymmetricRelaxedILPSolver(SymmetricILPSolver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str],
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -445,10 +431,8 @@ class SymmetricRelaxedILPSolver(SymmetricILPSolver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -460,7 +444,7 @@ class SymmetricRelaxedILPSolver(SymmetricILPSolver):
         profits = dict()
 
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+        for k, (atom, (charges, frequencies, _)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             idx.append(list(zip(itertools.repeat(k), range(len(charges)))))
             weights[k] = charges
@@ -487,7 +471,7 @@ class SymmetricRelaxedILPSolver(SymmetricILPSolver):
             >= -total_charge_diff
 
         # identical neighborhood charge conditions
-        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, charge_dists)
         for neighborhood_class in neighborhoodclasses:
             i = neighborhood_class[0]
             for j in neighborhood_class[1::]:
@@ -547,9 +531,8 @@ class DPSolver(Solver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str] = None,
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -568,11 +551,8 @@ class DPSolver(Solver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph \
-                    only used in Symmetric Solvers.
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -580,7 +560,7 @@ class DPSolver(Solver):
 
         atom_idx = dict()
 
-        for k, (atom, (_, _)) in enumerate(charge_dists.items()):
+        for k, atom in enumerate(charge_dists.keys()):
             atom_idx[k] = atom
 
         items, pos_total_charge, max_sum = self.transform_weights(charge_dists, total_charge, blowup)
@@ -604,7 +584,7 @@ class DPSolver(Solver):
 
     @staticmethod
     def transform_weights(
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
             blowup: int) -> Tuple[List[List[Tuple[int, int, float]]], float, float]:
         """Transform charge distributions into knapsack items with positive integer weights.
@@ -628,7 +608,7 @@ class DPSolver(Solver):
         # transform weights to non-negative integers
         pos_total_charge = total_charge
         max_sum = 0
-        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+        for k, (atom, (charges, frequencies, _)) in enumerate(charge_dists.items()):
             atom_idx[k] = atom
             w_min[k] = min(charges)
             max_sum += max(charges) - w_min[k]
@@ -723,9 +703,8 @@ class SymmetricDPSolver(DPSolver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str],
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -747,10 +726,8 @@ class SymmetricDPSolver(DPSolver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists_collector: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
@@ -758,9 +735,9 @@ class SymmetricDPSolver(DPSolver):
 
         atom_idx = dict()
 
-        for k, (atom, (_, _)) in enumerate(charge_dists_collector.items()):
+        for k, (atom, _) in enumerate(charge_dists_collector.items()):
             atom_idx[k] = atom
-        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, charge_dists_collector)
 
         # reduce charge distributions (charges and frequencies of atoms within one neighborhoodclass get combined)
         charge_dists_reduced = self.reduce_charge_distributions(charge_dists_collector, atom_idx, neighborhoodclasses)
@@ -804,9 +781,8 @@ class CDPSolver(Solver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str] = None,
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -825,15 +801,13 @@ class CDPSolver(Solver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         atom_idx = dict()
-        for k, (atom, (_, _)) in enumerate(charge_dists.items()):
+        for k, atom in enumerate(charge_dists.keys()):
             atom_idx[k] = atom
 
         solution, solutionTime, num_items, scaled_capacity = self.solve_dp_c(charge_dists, total_charge, total_charge_diff)
@@ -853,7 +827,7 @@ class CDPSolver(Solver):
         graph.graph['scaled_capacity'] = scaled_capacity
 
     def solve_dp_c(self,
-                   charge_dists: Dict[Atom, Tuple[ChargeList, WeightList]],
+                   charge_dists: Dict[Atom, Tuple[ChargeList, WeightList, str]],
                    total_charge: float,
                    total_charge_diff: float) -> Tuple[List[Tuple[int, int]], float, int, float]:
         """Solves the knapsack problem with dynamic programming implemented in C.
@@ -871,7 +845,7 @@ class CDPSolver(Solver):
         import charge.c.dp as dp
 
         num_sets = len(charge_dists)
-        num_items = sum(len(charges) for (_, (charges, _)) in charge_dists.items())
+        num_items = sum(len(charges) for (_, (charges, _, _)) in charge_dists.items())
 
         weights = dp.new_doublea(num_items)
         profits = dp.new_doublea(num_items)
@@ -880,7 +854,7 @@ class CDPSolver(Solver):
 
         offset = 0
         pos_total = total_charge
-        for k, (atom, (charges, frequencies)) in enumerate(charge_dists.items()):
+        for k, (atom, (charges, frequencies, _)) in enumerate(charge_dists.items()):
             dp.ushorta_setitem(sets, k, len(charges))
             for i, (charge, frequency) in enumerate(zip(charges, frequencies)):
                 dp.doublea_setitem(weights, offset + i, charge)
@@ -933,9 +907,8 @@ class SymmetricCDPSolver(CDPSolver):
     def solve_partial_charges(
             self,
             graph: nx.Graph,
-            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList]],
+            charge_dists_collector: Dict[Atom, Tuple[ChargeList, WeightList, str]],
             total_charge: int,
-            keydict: Dict[Atom, str] = None,
             total_charge_diff: float = DEFAULT_TOTAL_CHARGE_DIFF,
             **kwargs
             ) -> None:
@@ -957,18 +930,16 @@ class SymmetricCDPSolver(CDPSolver):
         Args:
             graph: The molecule graph to solve charges for.
             charge_dists_collector: Charge distributions for the atoms, obtained \
-                    by a Collector.
+                    by a Collector, plus the atom's canonical key.
             total_charge: The total charge of the molecule.
-            keydict: Dictionary containing nauty canonical keys of atom \
-                    neighborhoods for each atom of the graph
             total_charge_diff: Maximum allowed deviation from the total charge
         """
 
         atom_idx = dict()
-        for k, (atom, (_, _)) in enumerate(charge_dists_collector.items()):
+        for k, (atom, _) in enumerate(charge_dists_collector.items()):
             atom_idx[k] = atom
 
-        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, keydict)
+        neighborhoodclasses = self.compute_atom_neighborhood_classes(atom_idx, charge_dists_collector)
 
         # reduce charge distributions (charges and frequencies of atoms within one neighborhoodclass get combined)
         charge_dists_reduced = self.reduce_charge_distributions(charge_dists_collector, atom_idx, neighborhoodclasses)

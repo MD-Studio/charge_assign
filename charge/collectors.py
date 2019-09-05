@@ -48,7 +48,7 @@ class Collector(ABC):
             graph: nx.Graph,
             iacm_data_only: bool,
             shells: List[int]
-            ) -> Dict[Atom, Tuple[ChargeList, WeightList]]:
+            ) -> Dict[Atom, Tuple[ChargeList, WeightList, str]]:
         """Collect charges for a graph's atoms.
 
         For each atom in the graph, return a list of possible \
@@ -83,15 +83,13 @@ class Collector(ABC):
                     if shell_size in self._repository.charges_iacm:
                         key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'iacm')
                         if key in self._repository.charges_iacm[shell_size]:
-                            charges[atom] = self._collect(self._repository.charges_iacm, shell_size, key)
-                            keys[atom] = key
+                            charges[atom] = self._collect(self._repository.charges_iacm, shell_size, key) + (key,)
 
                 if not atom_has_iacm or (not atom in charges and not iacm_data_only):
                     if shell_size in self._repository.charges_elem:
                         key = self._nauty.canonize_neighborhood(graph, atom, shell_size, 'atom_type')
                         if key in self._repository.charges_elem[shell_size]:
-                            charges[atom] = self._collect(self._repository.charges_elem, shell_size, key)
-                            keys[atom] = key
+                            charges[atom] = self._collect(self._repository.charges_elem, shell_size, key) + (key,)
 
                 if atom in charges:
                     break
@@ -99,7 +97,7 @@ class Collector(ABC):
                 no_vals.append(atom)
 
         self._handle_error(no_vals, shells)
-        return charges, keys
+        return charges
 
     @abstractmethod
     def _collect(

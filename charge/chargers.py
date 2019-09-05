@@ -267,11 +267,15 @@ class ILPCharger(Charger):
             self._collector = CachingCollector(self._collector)
         self._solver = ILPSolver(rounding_digits, max_seconds)
 
+
 class SymmetricILPCharger(Charger):
     """A charger that uses Integer Linear Programming.
 
     This charger calculates an optimal charge distribution given the \
     charges found in a repository, using Integer Linear Programming.
+
+    Atoms with isomorphic neighborhoods are considered equal and we \
+    assign the same charge to all atoms in an equivalence class.
     """
     def __init__(
             self,
@@ -308,11 +312,15 @@ class SymmetricILPCharger(Charger):
             self._collector = CachingCollector(self._collector)
         self._solver = SymmetricILPSolver(rounding_digits, max_seconds)
 
+
 class SymmetricRelaxedILPCharger(Charger):
-    """A charger that uses Integer Linear Programming.
+    """A charger that uses Linear Programming.
 
     This charger calculates an optimal charge distribution given the \
-    charges found in a repository, using Integer Linear Programming.
+    charges found in a repository, using Linear Programming.
+
+    Atoms with isomorphic neighborhoods are considered equal and we \
+    assign the same charge to all atoms in an equivalence class.
     """
     def __init__(
             self,
@@ -388,12 +396,16 @@ class DPCharger(Charger):
             self._collector = CachingCollector(self._collector)
         self._solver = DPSolver(rounding_digits)
 
+
 class SymmetricDPCharger(Charger):
     """A charger that uses Dynamic Programming, Python version.
 
     This charger calculates an optimal charge distribution given the \
     charges found in a repository, using Dynamic Programming. The C \
     implementation in CDPCharger does the same, but runs faster.
+
+    Atoms with isomorphic neighborhoods are considered equal and we \
+    assign the same charge to all atoms in an equivalence class.
     """
     def __init__(
             self,
@@ -472,6 +484,9 @@ class SymmetricCDPCharger(Charger):
     This charger calculates an optimal charge distribution given the \
     charges found in a repository, using Dynamic Programming. This is \
     a faster C implementation than the Python one in DPCharger.
+
+    Atoms with isomorphic neighborhoods are considered equal and we \
+    assign the same charge to all atoms in an equivalence class.
     """
     def __init__(
             self,

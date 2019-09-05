@@ -310,10 +310,13 @@ class SymmetricILPSolver(ILPSolver):
         a 'partial_charge' attribute with the partial charge, and a \
         'score' attribute giving a degree of certainty for that charge.
 
-        This solver formulates the epsilon-Multiple Choice Knapsack \
+        This solver formulates the epsilon-Equivalence-Multiple Choice Knapsack \
         Problem as an Integer Linear Programming problem and then uses \
         a generic ILP solver from the pulp library to produce optimised \
         charges.
+
+        Atoms with isomorphic neighborhoods are considered equal and we \
+        assign the same charge to all atoms in an equivalence class.
 
         Args:
             graph: The molecule graph to solve charges for.
@@ -397,7 +400,7 @@ class SymmetricILPSolver(ILPSolver):
 
 
 class SymmetricRelaxedILPSolver(SymmetricILPSolver):
-    """An optimizing solver using Integer Linear Programming.
+    """An optimizing solver using Linear Programming.
 
     Use the HistogramCollector to produce appropriate charge \
     distributions.
@@ -431,10 +434,13 @@ class SymmetricRelaxedILPSolver(SymmetricILPSolver):
         a 'partial_charge' attribute with the partial charge, and a \
         'score' attribute giving a degree of certainty for that charge.
 
-        This solver formulates the epsilon-Multiple Choice Knapsack \
-        Problem as an Integer Linear Programming problem and then uses \
-        a generic ILP solver from the pulp library to produce optimised \
-        charges.
+        This solver formulates a relaxed version of the \
+        epsilon-Equivalence-Multiple Choice Knapsack Problem as an \
+        Linear Programming problem and then uses a generic LP solver \
+        from the pulp library to produce optimised charges.
+
+        Atoms with isomorphic neighborhoods are considered equal and we \
+        assign the same charge to all atoms in an equivalence class.
 
         Args:
             graph: The molecule graph to solve charges for.
@@ -731,9 +737,12 @@ class SymmetricDPSolver(DPSolver):
         'score' attribute giving a degree of certainty for that charge.
 
         This solver uses Dynamic Programming to solve the \
-        epsilon-Multiple Choice Knapsack Problem. This is the Python \
+        epsilon-Equivalence-Multiple Choice Knapsack Problem. This is the Python \
         version of the algorithm, see CDPSolver for a faster \
         implementation.
+
+        Atoms with isomorphic neighborhoods are considered equal and we \
+        assign the same charge to all atoms in an equivalence class.
 
         Args:
             graph: The molecule graph to solve charges for.
@@ -938,9 +947,12 @@ class SymmetricCDPSolver(CDPSolver):
         'score' attribute giving a degree of certainty for that charge.
 
         This solver uses Dynamic Programming to solve the \
-        epsilon-Multiple Choice Knapsack Problem. This is the Python \
+        epsilon-Equivalence-Multiple Choice Knapsack Problem. This is the Python \
         version of the algorithm, see DPSolver for the Python \
         implementation.
+
+        Atoms with isomorphic neighborhoods are considered equal and we \
+        assign the same charge to all atoms in an equivalence class.
 
         Args:
             graph: The molecule graph to solve charges for.

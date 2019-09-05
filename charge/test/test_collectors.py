@@ -46,6 +46,40 @@ def test_shell_size_order(ref_graph, mock_order_repository):
     assert means[1][:2] == ([0.34], [1.0])
 
 
+def test_count_nonzero_bins():
+
+    assert HistogramCollector._count_non_zero_bins(None, [0, 0, 0], [0, 1, 2]) == 1
+    assert HistogramCollector._count_non_zero_bins(None, [1, 1, 1], [0, 1, 2]) == 1
+    assert HistogramCollector._count_non_zero_bins(None, [2, 2, 2], [0, 1, 2]) == 1
+
+    assert HistogramCollector._count_non_zero_bins(None, [0, 0, 1], [0, 1, 2]) == 2
+    assert HistogramCollector._count_non_zero_bins(None, [0, 0, 2], [0, 1, 2]) == 2
+    assert HistogramCollector._count_non_zero_bins(None, [1, 1, 2], [0, 1, 2]) == 1
+
+    assert HistogramCollector._count_non_zero_bins(None, [0, 1, 1], [0, 1, 2]) == 2
+    assert HistogramCollector._count_non_zero_bins(None, [0, 2, 2], [0, 1, 2]) == 2
+    assert HistogramCollector._count_non_zero_bins(None, [1, 2, 2], [0, 1, 2]) == 1
+
+    assert HistogramCollector._count_non_zero_bins(None, [0, 1, 2], [0, 1, 2]) == 2
+
+
+def test_histogram():
+
+    assert HistogramCollector._histogram(None, [0, 0, 0], [0, 1, 2], 1) == ([3], [0])
+    assert HistogramCollector._histogram(None, [1, 1, 1], [0, 1, 2], 1) == ([3], [1])
+    assert HistogramCollector._histogram(None, [2, 2, 2], [0, 1, 2], 1) == ([3], [1])
+
+    assert HistogramCollector._histogram(None, [0, 0, 1], [0, 1, 2], 2) == ([2, 1], [0, 1])
+    assert HistogramCollector._histogram(None, [0, 0, 2], [0, 1, 2], 2) == ([2, 1], [0, 1])
+    assert HistogramCollector._histogram(None, [1, 1, 2], [0, 1, 2], 1) == ([3], [1])
+
+    assert HistogramCollector._histogram(None, [0, 1, 1], [0, 1, 2], 2) == ([1, 2], [0, 1])
+    assert HistogramCollector._histogram(None, [0, 2, 2], [0, 1, 2], 2) == ([1, 2], [0, 1])
+    assert HistogramCollector._histogram(None, [1, 2, 2], [0, 1, 2], 1) == ([3], [1])
+
+    assert HistogramCollector._histogram(None, [0, 1, 2], [0, 1, 2], 2) == ([1, 2], [0, 1])
+
+
 def test_histogram_collector(ref_graph, mock_repository):
     collector = HistogramCollector(mock_repository, 2)
 

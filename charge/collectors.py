@@ -345,6 +345,12 @@ class HistogramCollector(Collector):
 
         grain = 10**(-self._rounding_digits)
 
+        # make sure that the charges are sorted
+        for i, el in enumerate(charges[1:]):
+            if el >= charges[i - 1]:
+                charges.sort()
+                break
+
         # calc F-D width
         iqr = third_quartile(charges) - first_quartile(charges)
         fd_width = 2.0 * iqr / (len(charges)**(1./3))
@@ -353,37 +359,146 @@ class HistogramCollector(Collector):
 
         median_charge = round_to(median(charges), grain)
 
-        # subtract one because we start the loop with an increment
-        spacing = round_to(fd_width, grain) / grain
+        bin_size = round_to(fd_width, grain)
+
+        min_charge = charges[0]
+        max_charge = charges[-1]
+        if max_bins == 1:
+            # In the worst case the median_charge equals min_charge or max_charge,
+            # ergo max_bin_size = 2 * (max_charge - min_charge).
+            max_bin_size = round_to(2 * (max_charge - min_charge), grain)
+        else:
+            # Assume we equally divide (max_charge - min_charge) into max_bins. Then,
+            # in the worst case the median charge would be on one of the bin edges,
+            # requiring one additional bin. Ergo to get the max bin size, we divide
+            # (max_charge - min_charge) equally into (max_bins-1) bins.
+            max_bin_size = round_to((max_charge - min_charge) / (max_bins - 1), grain)
+
+        # add one for the first loop iteration
         num_bins = max_bins + 1
         while num_bins > max_bins:
-            step = grain * spacing
-
             # align center bin to median and find edge bin centers
             min_charge_bin = (median_charge -
-                    round_to(median_charge - min(charges), step))
+                    round_to(median_charge - min_charge, bin_size))
             max_charge_bin = (median_charge +
-                    round_to(max(charges) - median_charge, step))
+                    round_to(max_charge - median_charge, bin_size))
 
             # add half a step to include the last value
-            bin_centers = np.arange(min_charge_bin, max_charge_bin + 0.5*step, step)
+            bin_centers = np.arange(min_charge_bin, max_charge_bin + 0.5*bin_size, bin_size)
 
-            min_bin_edge = min_charge_bin - 0.5*step
-            max_bin_edge = max_charge_bin + 0.5*step
+            min_bin_edge = min_charge_bin - 0.5*bin_size
+            max_bin_edge = max_charge_bin + 0.5*bin_size
+
             # add half a step to include the last value
-            bin_edges = np.arange(min_bin_edge, max_bin_edge + 0.5*step, step)
+            bin_edges = np.arange(min_bin_edge, max_bin_edge + 0.5*bin_size, bin_size)
             # extend a bit to compensate for round-off error
             bin_edges[-1] += 1e-15
 
-            counts, _ = np.histogram(charges, bins=bin_edges)
-            num_bins = np.count_nonzero(counts)
-            spacing += 1
+            # count number of bins
+            num_bins = self._count_non_zero_bins(charges, bin_edges)
 
-        nonzero_bins = np.nonzero(counts)
-        counts = counts[nonzero_bins].tolist()
+            if bin_size < max_bin_size:
+                # increase bin size by half of the distance to the max bin size
+                bin_size = round_to(bin_size + 0.5 * (max_bin_size - bin_size), grain)
+            else:
+                # slowly increase bin size if we accidentally overstepped due to rounding errors and are still
+                # above the maximal number of bins (should not happen!)
+                bin_size += grain
+
+        counts, nonzero_bins = self._histogram(charges, bin_edges, num_bins)
+
         bin_centers = bin_centers[nonzero_bins].tolist()
 
         return bin_centers, counts
+
+    def _histogram(self, charges: List[float], bin_edges: np.array, num_bins: int) -> Tuple[List[int], List[int]]:
+        """Creates a histogram.
+
+        Requires a sorted list of charges and bin edges.
+
+        Args:
+            charges: A sorted list of charges.
+            bin_edges: A sorted list of bin edges.
+            num_bins: The number of non-zero bins
+
+        Returns:
+            A list of counts and a list of the non-zero indices.
+
+        """
+
+        nonzero_bins = []
+        counts = np.zeros(num_bins)
+        charge_index, nonzero_index = 0, 0
+
+        # iterate all but the last right edges
+        for k, edge in enumerate(bin_edges[1:-1]):
+
+            # are there charges in this bin (< the right edge)?
+            has_vals = False
+            while charge_index < len(charges) and charges[charge_index] < edge:
+                # increase bin count
+                counts[nonzero_index] += 1
+                charge_index += 1
+                has_vals = True
+
+            # go to next bin
+            if has_vals:
+                nonzero_bins.append(k)
+                nonzero_index += 1
+
+        # are there charges in the last bin (<= the last right edge?)
+        has_vals = False
+        while charge_index < len(charges) and charges[charge_index] <= bin_edges[-1]:
+            # increase bin count
+            counts[nonzero_index] += 1
+            charge_index += 1
+            has_vals = True
+
+        if has_vals:
+            nonzero_bins.append(len(bin_edges)-2)
+
+        return counts.tolist(), nonzero_bins
+
+    def _count_non_zero_bins(self, charges: List[float], bin_edges: np.array) -> int:
+        """Counts the number of non-zero bins.
+
+        Requires a sorted list of charges and bin edges. Let n be the size of the list of values and
+        m be the size of the list of bin edges, then the running time is O(m+n).
+
+        Args:
+            charges: A sorted list of charges.
+            bin_edges: A sorted list of bin edges.
+
+        Returns:
+            The number of non-zero bins.
+
+        """
+        num_bins = 0
+        charge_index = 0
+
+        # iterate all but the last right edges
+        for edge in bin_edges[1:-1]:
+
+            # are there charges in this bin (< the right edge)?
+            has_vals = False
+            while charge_index < len(charges) and charges[charge_index] < edge:
+                charge_index += 1
+                has_vals = True
+
+            # increase number of bins
+            if has_vals:
+                num_bins += 1
+
+        # are there charges in the last bin (<= the last right edge?)
+        has_vals = False
+        while charge_index < len(charges) and charges[charge_index] <= bin_edges[-1]:
+            charge_index += 1
+            has_vals = True
+
+        if has_vals:
+            num_bins += 1
+
+        return num_bins
 
     @staticmethod
     def score_histogram_count(histogram: Tuple[ChargeList, WeightList],

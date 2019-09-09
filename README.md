@@ -81,7 +81,7 @@ with charges included.
 The easiest way to use the service is through Docker:
 
 ```bash
-docker pull enitram/charge_assign
+docker pull mdstudio/charge_assign
 docker run -p 8080:8080 --mount-type=bind,source=/path/to/repo.zip,destination=/home/charge_assign/repo.zip --name charge_assign_server enitram/charge_assign
 ```
 
